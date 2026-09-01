@@ -33,16 +33,42 @@ sobra_dia5 = pix_dia5 - fixas_dia5 - reserva_pix_dia5
 sobra_dia15 = pix_dia15 - fixas_dia15 - reserva_pix_dia15
 sobra_total = sobra_dia5 + sobra_dia15
 
-# --- ESTILO INDIVIDUAL DAS CAIXAS ---
+# --- ESTILO DAS CAIXAS ---
 card_style = """
     background-color: #EBF5FB;
     border: 1px solid #AED6F1;
     border-left: 6px solid #1B4F72;
-    border-radius: 10px;
-    padding: 16px;
-    margin-bottom: 12px;
+    border-radius: 12px;
+    padding: 18px;
+    margin-bottom: 15px;
     color: #1C2833;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.04);
 """
+
+# Função para gerar barras de progresso HTML personalizadas
+def criar_barra_progresso(label, icon, gasto, meta, cor_barra="#1E88E5"):
+    pct = min((gasto / meta) * 100, 100.0)
+    resta = max(0.0, meta - gasto)
+    
+    gasto_fmt = f"{gasto:,.2f}".replace(',','_').replace('.',',').replace('_','.')
+    meta_fmt = f"{meta:,.2f}".replace(',','_').replace('.',',').replace('_','.')
+    resta_fmt = f"{resta:,.2f}".replace(',','_').replace('.',',').replace('_','.')
+    
+    return f"""
+    <div style="margin-top: 12px; margin-bottom: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <span style="font-weight: bold; color: #0F2537; font-size: 1rem;">{icon} {label}</span>
+            <span style="background-color: {cor_barra}; color: #FFFFFF; padding: 3px 10px; border-radius: 12px; font-size: 0.85rem; font-weight: bold;">{pct:.1f}%</span>
+        </div>
+        <div style="background-color: #D4E6F1; border-radius: 10px; height: 20px; width: 100%; overflow: hidden; border: 1px solid #AED6F1;">
+            <div style="background-color: {cor_barra}; width: {pct:.1f}%; height: 100%; border-radius: 8px;"></div>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-top: 5px; font-size: 0.88rem; color: #4A5568;">
+            <span>Gasto: <b>R$ {gasto_fmt}</b> de R$ {meta_fmt}</span>
+            <span>Resta: <b style="color: #1B4F72;">R$ {resta_fmt}</b></span>
+        </div>
+    </div>
+    """
 
 # --- SEÇÃO 1: RESUMO DO CAIXA ---
 st.markdown("### 📊 Visão Geral do Mês (Valores em Conta)")
@@ -125,23 +151,20 @@ with col_m1:
     st.markdown(f"""
     <div style="{card_style}">
         <h4 style="color: #0F2537; margin-top:0; margin-bottom: 10px;">Visão do Flash (VR)</h4>
-        <p style="margin: 4px 0;">• <b>Total Recebido:</b> R$ {vr_total:,.2f}</p>
-        <p style="margin: 4px 0;">• <b>Repasse Mãe:</b> R$ {vr_mae:,.2f}</p>
-        <p style="margin: 4px 0;">• <b>Seu Saldo Livre (Gasolina/Lucca):</b> R$ {vr_disponivel_livre:,.2f}</p>
+        <p style="margin: 6px 0;">• <b>Total Recebido:</b> R$ {vr_total:,.2f}</p>
+        <p style="margin: 6px 0;">• <b>Repasse Mãe:</b> R$ {vr_mae:,.2f}</p>
+        <p style="margin: 6px 0;">• <b>Seu Saldo Livre (Gasolina/Lucca):</b> R$ {vr_disponivel_livre:,.2f}</p>
     </div>
     """.replace(',','_').replace('.',',').replace('_','.'), unsafe_allow_html=True)
 
 with col_m2:
+    html_gas = criar_barra_progresso("Gasolina", "🚗", gasto_gas, meta_gasolina, "#1E88E5")
+    html_lucca = criar_barra_progresso("Lucca (Fralda/Leite)", "👶", gasto_lucca, meta_lucca, "#00ACC1")
+    
     st.markdown(f"""
     <div style="{card_style}">
         <h4 style="color: #0F2537; margin-top:0; margin-bottom: 8px;">Termômetro de Essenciais</h4>
+        {html_gas}
+        {html_lucca}
     </div>
     """, unsafe_allow_html=True)
-    
-    st.markdown("**🚗 Gasolina**")
-    st.progress(min(gasto_gas / meta_gasolina, 1.0))
-    st.caption(f"Gasto: R$ {gasto_gas:.2f} de R$ {meta_gasolina:.2f} | **Resta: R$ {meta_gasolina - gasto_gas:.2f}**")
-    
-    st.markdown("**👶 Lucca (Fralda/Leite)**")
-    st.progress(min(gasto_lucca / meta_lucca, 1.0))
-    st.caption(f"Gasto: R$ {gasto_lucca:.2f} de R$ {meta_lucca:.2f} | **Resta: R$ {meta_lucca - gasto_lucca:.2f}**")
