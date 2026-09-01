@@ -5,33 +5,42 @@ from datetime import datetime
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title="Central Financeira", page_icon="💼", layout="wide")
 
-# --- ESTILIZAÇÃO CSS (Azul Claro, Branco e Preto) ---
+# --- ESTILIZAÇÃO CSS (Fundo Branco + Caixas em Azul Claro Suave) ---
 st.markdown("""
 <style>
-    /* Estilo do fundo da página */
+    /* Fundo principal da página em branco puro */
     .stApp {
-        background-color: #F0F8FF; /* Azul bem claro */
-        color: #000000;
+        background-color: #FFFFFF !important;
     }
     
-    /* Estilização nativa dos Containers (Caixas/Cards) */
+    /* Estilização dos Containers (Caixas em Azul Claro de Alto Contraste) */
     [data-testid="stVerticalBlockBorderWrapper"] {
-        background-color: #FFFFFF !important;
+        background-color: #EBF5FB !important; /* Azul claro suave e elegante */
         border-radius: 12px !important;
-        border: 1px solid #E0E0E0 !important;
-        border-left: 6px solid #87CEFA !important; /* Borda lateral azul claro */
-        box-shadow: 0 4px 6px rgba(0,0,0,0.05) !important;
-        padding: 15px !important;
+        border: 1px solid #AED6F1 !important;
+        border-left: 6px solid #1B4F72 !important; /* Borda lateral azul marinho */
+        box-shadow: 0 4px 8px rgba(0,0,0,0.05) !important;
+        padding: 16px !important;
     }
 
-    /* Ajuste de cor de títulos e textos */
-    h1, h2, h3, h4, h5, h6, p, span, label {
-        color: #000000 !important;
+    /* Cores de texto em tom escuro para leitura clara */
+    h1, h2, h3, h4, h5, h6 {
+        color: #0F2537 !important;
+    }
+    
+    p, span, label, div {
+        color: #1C2833 !important;
     }
 
-    /* Customização da Barra de Progresso */
+    /* Subtítulos e legendas em cinza escuro */
+    [data-testid="stCaptionContainer"] {
+        color: #566573 !important;
+        font-weight: 500;
+    }
+
+    /* Customização das Barras de Progresso */
     .stProgress > div > div > div > div {
-        background-color: #1E90FF !important;
+        background-color: #2980B9 !important;
     }
 </style>
 """, unsafe_allow_html=True)
