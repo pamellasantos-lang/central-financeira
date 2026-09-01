@@ -4,108 +4,173 @@ from datetime import datetime
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title="Central Financeira", page_icon="💼", layout="wide")
-st.title("💼 Central Financeira Pessoal")
 
-# --- DADOS E METAS MENSAL ---
-mes_atual = datetime.now().month
-ano_atual = datetime.now().year
+# --- ESTILIZAÇÃO CSS (Azul Claro, Branco e Preto) ---
+st.markdown("""
+<style>
+    /* Estilo do fundo e texto principal */
+    .stApp {
+        background-color: #F0F8FF; /* Azul bem claro (AliceBlue) */
+        color: #000000;
+    }
+    
+    /* Estilo das caixas (Cards) */
+    .card {
+        background-color: #FFFFFF;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        border-left: 5px solid #87CEFA; /* Detalhe em LightSkyBlue */
+        margin-bottom: 20px;
+    }
+    
+    .card-title {
+        color: #000000;
+        font-size: 1.2rem;
+        font-weight: bold;
+        margin-bottom: 10px;
+    }
+    
+    .card-value {
+        color: #000000;
+        font-size: 2rem;
+        font-weight: bold;
+    }
+    
+    .card-sub {
+        color: #555555;
+        font-size: 0.9rem;
+    }
+</style>
+""", unsafe_allow_html=True)
 
-# Entradas Previstas
+st.title("💼 Painel de Controle - Setembro")
+
+# --- DADOS E METAS (Setembro 2026) ---
+# Entradas
 pix_dia5 = 2200.00
 pix_dia15 = 1850.00
 total_pix = pix_dia5 + pix_dia15
 
+# VR Flash Total
 vr_total = 682.50
 vr_mae = 500.00
-vr_disponivel = vr_total - vr_mae # R$ 182,50
+vr_disponivel_livre = vr_total - vr_mae
 
-# Regra de Contas Fixas
-if mes_atual == 9 and ano_atual == 2026:
-    fixas_dia5 = 1550.00 # Mãe R$ 250 + Carro (Agosto) R$ 1.300
-    fixas_dia15 = 1550.00 # Mãe R$ 250 + Carro (Setembro) R$ 1.300
-    st.info("⚠️ **Regra de Setembro Ativa:** Pagamento de 2 parcelas do carro (Agosto em atraso + Setembro).")
-else:
-    fixas_dia5 = 250.00
-    fixas_dia15 = 1550.00
-
+# Fixas (Regra de Setembro: Carro dobrado)
+fixas_dia5 = 250.00 + 1300.00 # Mãe + Carro Agosto
+fixas_dia15 = 250.00 + 1300.00 # Mãe + Carro Setembro
 total_fixas = fixas_dia5 + fixas_dia15
 
-# Metas Essenciais
+# Reservas Essenciais (Gasto em PIX)
 meta_gasolina = 400.00
-meta_lucca = 480.00 # Fralda R$ 320 + Leite R$ 160
-total_essenciais = meta_gasolina + meta_lucca # R$ 880,00
-
-# Quanto do essenciais precisa ser pago via PIX (descontando o VR livre)
-reserva_pix_total = total_essenciais - vr_disponivel # R$ 697,50
-
-# Divisão Sugerida de Reserva por Quinzena
+meta_lucca = 480.00
+reserva_pix_total = (meta_gasolina + meta_lucca) - vr_disponivel_livre
 reserva_pix_dia5 = 450.00
-reserva_pix_dia15 = reserva_pix_total - reserva_pix_dia5 # R$ 247,50
+reserva_pix_dia15 = reserva_pix_total - reserva_pix_dia5
 
-# Sobras por Quinzena pós Fixas e Reservas Essenciais
-sobra_dia5 = pix_dia5 - fixas_dia5 - reserva_pix_dia5 # R$ 200,00
-sobra_dia15 = pix_dia15 - fixas_dia15 - reserva_pix_dia15 # R$ 52,50
-sobra_total_mes = sobra_dia5 + sobra_dia15 # R$ 252,50
+# Sobra Livre
+sobra_dia5 = pix_dia5 - fixas_dia5 - reserva_pix_dia5
+sobra_dia15 = pix_dia15 - fixas_dia15 - reserva_pix_dia15
+sobra_total = sobra_dia5 + sobra_dia15
 
-# --- PAINEL PRINCIPAL ---
-st.markdown("### 📊 Visão Geral de Setembro")
-c1, c2, c3, c4 = st.columns(4)
-c1.metric("Entradas (PIX)", f"R$ {total_pix:,.2f}".replace(',','_').replace('.',',').replace('_','.'))
-c2.metric("Contas Fixas", f"R$ {total_fixas:,.2f}".replace(',','_').replace('.',',').replace('_','.'))
-c3.metric("Reserva Essenciais (PIX)", f"R$ {reserva_pix_total:,.2f}".replace(',','_').replace('.',',').replace('_','.'))
-c4.metric("Sobra Livre p/ Dívidas", f"R$ {sobra_total_mes:,.2f}".replace(',','_').replace('.',',').replace('_','.'), delta="Livre no Mês")
+# --- SEÇÃO 1: RESUMO DO CAIXA (CAIXAS/CARDS) ---
+st.markdown("### 📊 Visão Geral do Mês (Valores em Conta)")
+col1, col2, col3, col4 = st.columns(4)
 
-st.divider()
+with col1:
+    st.markdown(f"""
+    <div class="card">
+        <div class="card-title">Entradas (PIX)</div>
+        <div class="card-value">R$ {total_pix:,.2f}</div>
+        <div class="card-sub">Dias 05 e 15</div>
+    </div>
+    """, unsafe_allow_html=True)
 
-# --- BLOCO DE RESERVAS ESSENCIAIS ---
-st.markdown("### 🛒 Planejamento de Reservas Essenciais")
-st.write("Valores exatos que você precisa carimbar/separar para **Gasolina, Fraldas e Leite** em cada pagamento:")
+with col2:
+    st.markdown(f"""
+    <div class="card">
+        <div class="card-title">Despesas Fixas</div>
+        <div class="card-value">R$ {total_fixas:,.2f}</div>
+        <div class="card-sub">Carro (x2) + Mãe</div>
+    </div>
+    """, unsafe_allow_html=True)
 
-col_res1, col_res2, col_res3 = st.columns(3)
+with col3:
+    st.markdown(f"""
+    <div class="card">
+        <div class="card-title">Reserva Essenciais</div>
+        <div class="card-value">R$ {reserva_pix_total:,.2f}</div>
+        <div class="card-sub">Valor retido do PIX</div>
+    </div>
+    """, unsafe_allow_html=True)
 
-with col_res1:
-    st.subheader("🎯 Metas do Mês")
-    st.write(f"• **Gasolina:** R$ {meta_gasolina:.2f}")
-    st.write(f"• **Lucca (Fraldas + Leite):** R$ {meta_lucca:.2f}")
-    st.write(f"• **Total Essencial:** R$ {total_essenciais:.2f}")
-    st.caption(f"💡 R$ {vr_disponivel:.2f} é coberto pelo VR Flash. Os outros R$ {reserva_pix_total:.2f} saem do PIX.")
+with col4:
+    st.markdown(f"""
+    <div class="card" style="border-left: 5px solid #000000;">
+        <div class="card-title">Livre p/ Dívidas</div>
+        <div class="card-value">R$ {sobra_total:,.2f}</div>
+        <div class="card-sub">Sobra Real no Mês</div>
+    </div>
+    """, unsafe_allow_html=True)
 
-with col_res2:
-    st.subheader("📅 Reserva no Dia 05")
-    st.metric("Guardar do Pagamento 05", f"R$ {reserva_pix_dia5:.2f}")
-    st.write(f"• Entram: R$ {pix_dia5:.2f}")
-    st.write(f"• Paga Fixas (Carro+Mãe): R$ {fixas_dia5:.2f}")
-    st.write(f"• **Sobra Livre no Dia 05:** R$ {sobra_dia5:.2f}")
+# --- SEÇÃO 2: PLANEJAMENTO POR QUINZENA ---
+st.markdown("### 📅 O Que Fazer em Cada Pagamento")
+col_q1, col_q2 = st.columns(2)
 
-with col_res3:
-    st.subheader("📅 Reserva no Dia 15")
-    st.metric("Guardar do Adiantamento 15", f"R$ {reserva_pix_dia15:.2f}")
-    st.write(f"• Entram: R$ {pix_dia15:.2f}")
-    st.write(f"• Paga Fixas (Carro+Mãe): R$ {fixas_dia15:.2f}")
-    st.write(f"• **Sobra Livre no Dia 15:** R$ {sobra_dia15:.2f}")
+with col_q1:
+    st.markdown(f"""
+    <div class="card">
+        <div class="card-title">Ação no Dia 05 (Recebe R$ 2.200)</div>
+        <p>1. Pague as Fixas: <b>R$ {fixas_dia5:,.2f}</b></p>
+        <p>2. Guarde para Essenciais: <b>R$ {reserva_pix_dia5:,.2f}</b></p>
+        <hr>
+        <p><b>Sobra no dia 05:</b> R$ {sobra_dia5:,.2f}</p>
+    </div>
+    """, unsafe_allow_html=True)
 
-st.divider()
+with col_q2:
+    st.markdown(f"""
+    <div class="card">
+        <div class="card-title">Ação no Dia 15 (Recebe R$ 1.850)</div>
+        <p>1. Pague as Fixas: <b>R$ {fixas_dia15:,.2f}</b></p>
+        <p>2. Guarde para Essenciais: <b>R$ {reserva_pix_dia15:,.2f}</b></p>
+        <hr>
+        <p><b>Sobra no dia 15:</b> R$ {sobra_dia15:,.2f}</p>
+    </div>
+    """, unsafe_allow_html=True)
 
-# --- TERMÔMETRO DE GASTOS REALIZADOS ---
-st.markdown("### 📉 Acompanhamento em Tempo Real")
+# --- SEÇÃO 3: CONTROLE DO VR E METAS ---
+st.markdown("### 💳 Controle de Flash (VR) e Metas")
+col_m1, col_m2 = st.columns(2)
+
 # Simulando dados da planilha
 gastos_registrados = pd.DataFrame({
-    'Data': ['01/09/2026', '01/09/2026'],
-    'Tipo': ['VR (Flash)', 'VR (Flash)'],
     'Descrição': ['Gasolina', 'Fraldas'],
     'Valor (R$)': [50.00, 89.90]
 })
+gasto_gas = 50.00
+gasto_lucca = 89.90
 
-gasto_gas = gastos_registrados[gastos_registrados['Descrição'] == 'Gasolina']['Valor (R$)'].sum()
-gasto_lucca = gastos_registrados[gastos_registrados['Descrição'].isin(['Fraldas', 'Leite'])]['Valor (R$)'].sum()
+with col_m1:
+    st.markdown(f"""
+    <div class="card">
+        <div class="card-title">Visão do Flash (VR)</div>
+        <p><b>Total Recebido:</b> R$ {vr_total:,.2f}</p>
+        <p><b>Repasse Mãe:</b> R$ {vr_mae:,.2f}</p>
+        <p><b>Seu Saldo Livre (Gasolina/Lucca):</b> R$ {vr_disponivel_livre:,.2f}</p>
+    </div>
+    """, unsafe_allow_html=True)
 
-g1, g2 = st.columns(2)
-with g1:
+with col_m2:
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown("<div class='card-title'>Termômetro de Essenciais</div>", unsafe_allow_html=True)
+    
     st.markdown("**🚗 Gasolina**")
     st.progress(min(gasto_gas / meta_gasolina, 1.0))
     st.caption(f"Gasto: R$ {gasto_gas:.2f} de R$ {meta_gasolina:.2f} | **Resta: R$ {meta_gasolina - gasto_gas:.2f}**")
-
-with g2:
+    
     st.markdown("**👶 Lucca (Fralda/Leite)**")
     st.progress(min(gasto_lucca / meta_lucca, 1.0))
     st.caption(f"Gasto: R$ {gasto_lucca:.2f} de R$ {meta_lucca:.2f} | **Resta: R$ {meta_lucca - gasto_lucca:.2f}**")
+    st.markdown('</div>', unsafe_allow_html=True)
