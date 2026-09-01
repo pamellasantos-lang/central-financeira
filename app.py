@@ -1,42 +1,53 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-from streamlit_gsheets import GSheetsConnection
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title="Central Financeira", page_icon="💼", layout="wide")
 
 st.title("💼 Painel de Controle - Setembro")
 
-# --- CONEXÃO COM O GOOGLE SHEETS ---
-conn = st.connection("gsheets", type=GSheetsConnection)
+# --- CONEXÃO COM A PLANILHA DO GOOGLE ---
+SHEET_ID = "1Y7EsUDd9J_liLwwTbRdjM2lM_XcdsWr_kYNUC-MAZsY"
+
+def carregar_aba(nome_aba):
+    url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={nome_aba.replace(' ', '%20')}"
+    return pd.read_csv(url)
 
 try:
-    df_entradas = conn.read(worksheet="Entradas Agosto")
-    df_fixas = conn.read(worksheet="Dividas Fixas")
-    df_gastos = conn.read(worksheet="Gastos Setembro")
+    df_entradas = carregar_aba("Entradas Agosto")
+    df_fixas = carregar_aba("Dividas Fixas")
+    df_gastos = carregar_aba("Gastos Setembro")
 except Exception as e:
-    st.error("Aguardando sincronização com a planilha do Google...")
+    st.error("⚠️ Não foi possível ler a planilha. Verifique se o compartilhamento está como 'Qualquer pessoa com o link'.")
     st.stop()
 
 # --- PROCESSAMENTO AUTOMÁTICO DE DADOS ---
-# Tratamento de Entradas PIX
-total_pix = df_entradas[df_entradas['Tipo'] != 'VR']['Total a Receber (R$)'].sum() if not df_entradas.empty else 4050.00
+# Processar Entradas em Dinheiro (PIX)
+try:
+    col_valor_ent = [c for c in df_entradas.columns if 'Receber' in c or 'Valor' in c][0]
+    col_tipo_ent = [c for c in df_entradas.columns if 'Tipo' in c or 'Recebimento' in c][0]
+    total_pix = df_entradas[~df_entradas[col_tipo_ent].astype(str).str.contains('VR', case=False, na=False)][col_valor_ent].sum()
+except:
+    total_pix = 4050.00
 
-# Tratamento do VR / Flash
+# VR / Flash
 vr_total = 682.50
 vr_mae = 500.00
 vr_disponivel_livre = vr_total - vr_mae
 
-# Tratamento de Gastos Reais da aba Gastos Setembro
-if not df_gastos.empty and 'Descrição do Gasto' in df_gastos.columns:
-    gasto_gas = df_gastos[df_gastos['Descrição do Gasto'].str.contains('Gasolina', case=False, na=False)]['Valor (R$)'].sum()
-    gasto_lucca = df_gastos[df_gastos['Descrição do Gasto'].str.contains('Fralda|Leite', case=False, na=False)]['Valor (R$)'].sum()
-else:
+# Processar Gastos da Aba 'Gastos Setembro'
+try:
+    col_desc_gastos = [c for c in df_gastos.columns if 'Descrição' in c or 'Gasto' in c][0]
+    col_valor_gastos = [c for c in df_gastos.columns if 'Valor' in c][0]
+    
+    gasto_gas = df_gastos[df_gastos[col_desc_gastos].astype(str).str.contains('Gasolina', case=False, na=False)][col_valor_gastos].sum()
+    gasto_lucca = df_gastos[df_gastos[col_desc_gastos].astype(str).str.contains('Fralda|Leite', case=False, na=False)][col_valor_gastos].sum()
+except:
     gasto_gas = 0.0
     gasto_lucca = 0.0
 
-# Regra de Setembro (Fixas)
+# Regras de Setembro (Fixas)
 fixas_dia5 = 250.00 + 1300.00
 fixas_dia15 = 250.00 + 1300.00
 total_fixas = fixas_dia5 + fixas_dia15
@@ -48,12 +59,12 @@ reserva_pix_total = (meta_gasolina + meta_lucca) - vr_disponivel_livre
 reserva_pix_dia5 = 450.00
 reserva_pix_dia15 = reserva_pix_total - reserva_pix_dia5
 
-# Sobra Livre Calculada
+# Sobra Livre
 sobra_dia5 = 2200.00 - fixas_dia5 - reserva_pix_dia5
 sobra_dia15 = 1850.00 - fixas_dia15 - reserva_pix_dia15
 sobra_total = sobra_dia5 + sobra_dia15
 
-# --- ESTILO E FUNÇÃO DA BARRA ---
+# --- ESTILO DAS CAIXAS ---
 card_style = "background-color: #EBF5FB; border: 1px solid #AED6F1; border-left: 6px solid #1B4F72; border-radius: 12px; padding: 18px; margin-bottom: 15px; color: #1C2833; box-shadow: 0 4px 6px rgba(0,0,0,0.04);"
 
 def criar_barra_progresso(label, icon, gasto, meta, cor_barra="#1E88E5"):
@@ -65,7 +76,7 @@ def criar_barra_progresso(label, icon, gasto, meta, cor_barra="#1E88E5"):
     
     return f'<div style="margin-top: 12px; margin-bottom: 16px;"><div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;"><span style="font-weight: bold; color: #0F2537; font-size: 1rem;">{icon} {label}</span><span style="background-color: {cor_barra}; color: #FFFFFF; padding: 3px 10px; border-radius: 12px; font-size: 0.85rem; font-weight: bold;">{pct:.1f}%</span></div><div style="background-color: #D4E6F1; border-radius: 10px; height: 20px; width: 100%; overflow: hidden; border: 1px solid #AED6F1;"><div style="background-color: {cor_barra}; width: {pct:.1f}%; height: 100%; border-radius: 8px;"></div></div><div style="display: flex; justify-content: space-between; margin-top: 5px; font-size: 0.88rem; color: #4A5568;"><span>Gasto: <b>R$ {gasto_fmt}</b> de R$ {meta_fmt}</span><span>Resta: <b style="color: #1B4F72;">R$ {resta_fmt}</b></span></div></div>'
 
-# --- RENDERIZAÇÃO DO PAINEL ---
+# --- SEÇÃO 1: RESUMO DO CAIXA ---
 st.markdown("### 📊 Visão Geral do Mês (Valores em Conta)")
 col1, col2, col3, col4 = st.columns(4)
 
@@ -83,6 +94,7 @@ with col4:
 
 st.divider()
 
+# --- SEÇÃO 2: PLANEJAMENTO POR QUINZENA ---
 st.markdown("### 📅 O Que Fazer em Cada Pagamento")
 col_q1, col_q2 = st.columns(2)
 
@@ -94,6 +106,7 @@ with col_q2:
 
 st.divider()
 
+# --- SEÇÃO 3: CONTROLE DO VR E METAS ---
 st.markdown("### 💳 Controle de Flash (VR) e Metas")
 col_m1, col_m2 = st.columns(2)
 
