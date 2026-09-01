@@ -52,7 +52,6 @@ try:
     col_tipo_ent = [c for c in df_entradas.columns if 'Tipo' in c or 'Recebimento' in c][0]
     df_entradas['Valor_Clean'] = df_entradas[col_valor_ent].apply(limpar_valor)
     
-    # Entradas PIX
     pix_rows = df_entradas[~df_entradas[col_tipo_ent].astype(str).str.contains('VR', case=False, na=False)]
     total_pix = pix_rows['Valor_Clean'].sum()
     if total_pix == 0:
@@ -63,19 +62,38 @@ except:
 # VR / Flash
 vr_total = 682.50
 vr_mae = 500.00
-vr_disponivel_livre = vr_total - vr_mae
+vr_disponivel_livre = vr_total - vr_mae # R$ 182.50
 
-# Processar Gastos da Aba 'Gastos Setembro'
+# Processar Gastos por Categoria e por Origem (VR vs PIX/Dinheiro)
+gas_vr, gas_pix = 0.0, 0.0
+lucca_vr, lucca_pix = 0.0, 0.0
+
 try:
-    col_desc_gastos = [c for c in df_gastos.columns if 'Descrição' in c or 'Gasto' in c or 'Tipo' in c][0]
-    col_valor_gastos = [c for c in df_gastos.columns if 'Valor' in c][0]
-    df_gastos['Valor_Clean'] = df_gastos[col_valor_gastos].apply(limpar_valor)
-    
-    gasto_gas = df_gastos[df_gastos[col_desc_gastos].astype(str).str.contains('Gasolina', case=False, na=False)]['Valor_Clean'].sum()
-    gasto_lucca = df_gastos[df_gastos[col_desc_gastos].astype(str).str.contains('Fralda|Leite', case=False, na=False)]['Valor_Clean'].sum()
+    if not df_gastos.empty:
+        cols_valor = [c for c in df_gastos.columns if 'Valor' in c]
+        col_val = cols_valor[0] if cols_valor else df_gastos.columns[-1]
+        df_gastos['Valor_Clean'] = df_gastos[col_val].apply(limpar_valor)
+        
+        cols_texto = [c for c in df_gastos.columns if c != col_val and c != 'Valor_Clean']
+        texto_linha = df_gastos[cols_texto].astype(str).agg(' '.join, axis=1)
+        
+        is_vr = texto_linha.str.contains('VR|Flash', case=False, na=False)
+        is_pix = ~is_vr
+        
+        is_gas = texto_linha.str.contains('Gasolina', case=False, na=False)
+        is_lucca = texto_linha.str.contains('Fralda|Leite', case=False, na=False)
+        
+        gas_vr = df_gastos[is_gas & is_vr]['Valor_Clean'].sum()
+        gas_pix = df_gastos[is_gas & is_pix]['Valor_Clean'].sum()
+        
+        lucca_vr = df_gastos[is_lucca & is_vr]['Valor_Clean'].sum()
+        lucca_pix = df_gastos[is_lucca & is_pix]['Valor_Clean'].sum()
 except:
-    gasto_gas = 50.00
-    gasto_lucca = 89.90
+    gas_vr, gas_pix = 50.00, 0.0
+    lucca_vr, lucca_pix = 89.90, 0.0
+
+gasto_total_vr = gas_vr + lucca_vr
+saldo_vr_restante = max(0.0, vr_disponivel_livre - gasto_total_vr)
 
 # Regras de Setembro (Fixas)
 fixas_dia5 = 250.00 + 1300.00
@@ -97,14 +115,15 @@ sobra_total = sobra_dia5 + sobra_dia15
 # --- ESTILO DAS CAIXAS ---
 card_style = "background-color: #EBF5FB; border: 1px solid #AED6F1; border-left: 6px solid #1B4F72; border-radius: 12px; padding: 18px; margin-bottom: 15px; color: #1C2833; box-shadow: 0 4px 6px rgba(0,0,0,0.04);"
 
-def criar_barra_progresso(label, icon, gasto, meta, cor_barra="#1E88E5"):
-    pct = min((gasto / meta) * 100, 100.0) if meta > 0 else 0
-    resta = max(0.0, meta - gasto)
-    gasto_fmt = fmt_brl(gasto)
-    meta_fmt = fmt_brl(meta)
-    resta_fmt = fmt_brl(resta)
+def criar_barra_progresso_detalhada(label, icon, gasto_vr, gasto_pix, meta, cor_vr="#1E88E5", cor_pix="#26A69A"):
+    gasto_total = gasto_vr + gasto_pix
+    pct_total = min((gasto_total / meta) * 100, 100.0) if meta > 0 else 0
+    resta = max(0.0, meta - gasto_total)
     
-    return f'<div style="margin-top: 12px; margin-bottom: 16px;"><div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;"><span style="font-weight: bold; color: #0F2537; font-size: 1rem;">{icon} {label}</span><span style="background-color: {cor_barra}; color: #FFFFFF; padding: 3px 10px; border-radius: 12px; font-size: 0.85rem; font-weight: bold;">{pct:.1f}%</span></div><div style="background-color: #D4E6F1; border-radius: 10px; height: 20px; width: 100%; overflow: hidden; border: 1px solid #AED6F1;"><div style="background-color: {cor_barra}; width: {pct:.1f}%; height: 100%; border-radius: 8px;"></div></div><div style="display: flex; justify-content: space-between; margin-top: 5px; font-size: 0.88rem; color: #4A5568;"><span>Gasto: <b>{gasto_fmt}</b> de {meta_fmt}</span><span>Resta: <b style="color: #1B4F72;">{resta_fmt}</b></span></div></div>'
+    pct_vr = (gasto_vr / meta) * 100 if meta > 0 else 0
+    pct_pix = (gasto_pix / meta) * 100 if meta > 0 else 0
+    
+    return f'<div style="margin-top: 12px; margin-bottom: 16px;"><div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;"><span style="font-weight: bold; color: #0F2537; font-size: 1rem;">{icon} {label}</span><span style="background-color: #1B4F72; color: #FFFFFF; padding: 3px 10px; border-radius: 12px; font-size: 0.85rem; font-weight: bold;">{pct_total:.1f}% Usado</span></div><div style="background-color: #D4E6F1; border-radius: 10px; height: 20px; width: 100%; overflow: hidden; border: 1px solid #AED6F1; display: flex;"><div style="background-color: {cor_vr}; width: {pct_vr:.1f}%; height: 100%;" title="Gasto VR: {fmt_brl(gasto_vr)}"></div><div style="background-color: {cor_pix}; width: {pct_pix:.1f}%; height: 100%;" title="Gasto PIX: {fmt_brl(gasto_pix)}"></div></div><div style="display: flex; justify-content: space-between; margin-top: 6px; font-size: 0.85rem; color: #2C3E50;"><span>💳 <b>VR:</b> {fmt_brl(gasto_vr)} | 💵 <b>PIX:</b> {fmt_brl(gasto_pix)}</span><span>Resta: <b style="color: #1B4F72;">{fmt_brl(resta)}</b></span></div></div>'
 
 # --- SEÇÃO 1: RESUMO DO CAIXA ---
 st.markdown("### 📊 Visão Geral do Mês (Valores em Conta)")
@@ -137,14 +156,14 @@ with col_q2:
 st.divider()
 
 # --- SEÇÃO 3: CONTROLE DO VR E METAS ---
-st.markdown("### 💳 Controle de Flash (VR) e Metas")
+st.markdown("### 💳 Controle de Flash (VR) vs. Dinheiro/PIX")
 col_m1, col_m2 = st.columns(2)
 
 with col_m1:
-    st.markdown(f'<div style="{card_style}"><h4 style="color: #0F2537; margin-top:0; margin-bottom: 10px;">Visão do Flash (VR)</h4><p style="margin: 6px 0;">• <b>Total Recebido:</b> {fmt_brl(vr_total)}</p><p style="margin: 6px 0;">• <b>Repasse Mãe:</b> {fmt_brl(vr_mae)}</p><p style="margin: 6px 0;">• <b>Seu Saldo Livre (Gasolina/Lucca):</b> {fmt_brl(vr_disponivel_livre)}</p></div>', unsafe_allow_html=True)
+    st.markdown(f'<div style="{card_style}"><h4 style="color: #0F2537; margin-top:0; margin-bottom: 10px;">💳 Cartão Flash (VR)</h4><p style="margin: 5px 0;">• <b>Total Recebido:</b> {fmt_brl(vr_total)}</p><p style="margin: 5px 0;">• <b>Repasse Mãe:</b> {fmt_brl(vr_mae)}</p><p style="margin: 5px 0;">• <b>Seu VR Livre Inicial:</b> {fmt_brl(vr_disponivel_livre)}</p><hr style="border: 0.5px solid #AED6F1; margin: 8px 0;"><p style="margin: 5px 0;">• <b>Gasto no VR até agora:</b> <span style="color: #1E88E5; font-weight: bold;">{fmt_brl(gasto_total_vr)}</span></p><p style="margin: 5px 0; font-size: 1.05em;">• <b>Saldo Restante no VR:</b> <b style="color: #1B4F72;">{fmt_brl(saldo_vr_restante)}</b></p><small style="color: #566573;">⚠️ Saldo exclusivo para compras no cartão (VR).</small></div>', unsafe_allow_html=True)
 
 with col_m2:
-    html_gas = criar_barra_progresso("Gasolina", "🚗", gasto_gas, meta_gasolina, "#1E88E5")
-    html_lucca = criar_barra_progresso("Lucca (Fralda/Leite)", "👶", gasto_lucca, meta_lucca, "#00ACC1")
+    html_gas = criar_barra_progresso_detalhada("Gasolina", "🚗", gas_vr, gas_pix, meta_gasolina, cor_vr="#1E88E5", cor_pix="#26A69A")
+    html_lucca = criar_barra_progresso_detalhada("Lucca (Fralda/Leite)", "👶", lucca_vr, lucca_pix, meta_lucca, cor_vr="#1E88E5", cor_pix="#26A69A")
     
-    st.markdown(f'<div style="{card_style}"><h4 style="color: #0F2537; margin-top:0; margin-bottom: 8px;">Termômetro de Essenciais</h4>{html_gas}{html_lucca}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div style="{card_style}"><h4 style="color: #0F2537; margin-top:0; margin-bottom: 8px;">🎯 Termômetro de Essenciais (Origem)</h4>{html_gas}{html_lucca}<div style="margin-top: 10px; font-size: 0.8rem; color: #566573;">🔹 <b>Azul:</b> Pago com VR | 🟢 <b>Verde:</b> Pago com Dinheiro/PIX</div></div>', unsafe_allow_html=True)
