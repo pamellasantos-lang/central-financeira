@@ -23,6 +23,10 @@ def get_image_base64(path):
     except Exception:
         return ""
 
+# Tenta carregar a imagem do avatar fornecida
+img_base64 = get_image_base64("assistente.png")
+avatar_src = f"data:image/png;base64,{img_base64}" if img_base64 else "https://cdn-icons-png.flaticon.com/512/4140/4140048.png"
+
 # --- ESTILIZAÇÃO CSS EXECUTIVA ---
 st.markdown("""
 <style>
@@ -95,14 +99,15 @@ st.markdown("""
     .kpi-value-main { font-size: 1.8rem; font-weight: 800; color: #0F172A; }
     .kpi-subtext { font-size: 0.85rem; font-weight: 600; color: #64748B; margin-top: 4px; }
     
-    /* AVATAR EXPANDIDO */
+    /* AVATAR EXPANDIDO E CENTRALIZADO */
     .avatar-frame {
-        width: 115px;
-        height: 115px;
+        width: 150px;
+        height: 150px;
         border-radius: 50%;
         object-fit: cover;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.12);
-        margin-top: 2px;
+        box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+        display: block;
+        margin: 0 auto;
         transition: all 0.3s ease;
     }
     
@@ -111,12 +116,12 @@ st.markdown("""
         position: relative;
         background: #FFFFFF;
         border-radius: 14px;
-        padding: 12px 18px;
+        padding: 14px 20px;
         border: 2px solid #CBD5E1;
-        font-size: 0.9rem;
+        font-size: 0.95rem;
         color: #1E293B;
         box-shadow: 0 4px 12px rgba(0,0,0,0.04);
-        margin-top: 6px;
+        margin-top: 10px;
         display: inline-block;
     }
     
@@ -125,7 +130,7 @@ st.markdown("""
         content: '';
         position: absolute;
         left: -10px;
-        top: 22px;
+        top: 25px;
         width: 0;
         height: 0;
         border-top: 8px solid transparent;
@@ -136,7 +141,7 @@ st.markdown("""
         content: '';
         position: absolute;
         left: -13px;
-        top: 21px;
+        top: 24px;
         width: 0;
         height: 0;
         border-top: 9px solid transparent;
@@ -314,29 +319,31 @@ else:
 img_base64 = get_image_base64(avatar_file)
 avatar_src = f"data:image/png;base64,{img_base64}" if img_base64 else "https://cdn-icons-png.flaticon.com/512/4140/4140048.png"
 
-# --- HEADER REORGANIZADO E ALINHADO COM BALÃO DE FALA PURO ---
+# --- HEADER REORGANIZADO COM AVATAR MAIOR E BALÃO ALINHADO ---
 with st.container(border=True):
-    col_av, col_tit, col_filtros = st.columns([1.2, 4.2, 3.2])
+    # Proporções ajustadas para acomodar perfeitamente o avatar maior e centralizar os textos
+    col_av, col_tit, col_filtros = st.columns([1.5, 4.5, 3.0]) 
     
     with col_av:
         st.markdown(f"""
-        <div style="text-align:center;">
-            <img src="{avatar_src}" class="avatar-frame" style="border: 4px solid {border_semaforo};" alt="Avatar da Assistente">
+        <div style="display: flex; justify-content: center; align-items: center; height: 100%; margin-top: 5px;">
+            <img src="{avatar_src}" class="avatar-frame" style="border: 5px solid {border_semaforo};" alt="Avatar da Assistente">
         </div>
         """, unsafe_allow_html=True)
         
     with col_tit:
         st.markdown(f"""
-        <h2 style='margin:0; font-size:1.65rem; font-weight:800; color:#0F172A;'>CONTROLE FINANCEIRO <span style='color:#FF5722;'>PAMELLA</span></h2>
+        <h2 style='margin:0; padding-top:5px; font-size:1.75rem; font-weight:800; color:#0F172A;'>CONTROLE FINANCEIRO <span style='color:#FF5722;'>PAMELLA</span></h2>
         <div class="speech-bubble">
-            <b style="color:{cor_semaforo}; font-size:0.95rem;">{status_texto}</b> <span style="font-size:0.85rem; color:#64748B;">{assistente_expressao}</span><br>
-            <span style="font-size:0.85rem; color:#334155;">
+            <b style="color:{cor_semaforo}; font-size:1.05rem;">{status_texto}</b> <span style="font-size:0.95rem; color:#64748B;">{assistente_expressao}</span><br>
+            <span style="font-size:0.9rem; color:#334155; display:inline-block; margin-top:4px;">
                 Caso queira saber mais, acesse o painel <a href="#insights" style="color:#0284C7; font-weight:700; text-decoration:none;">INSIGHTS DA ASSISTENTE clicando aqui</a>.
             </span>
         </div>
         """, unsafe_allow_html=True)
         
     with col_filtros:
+        st.markdown("<div style='margin-top: 25px;'></div>", unsafe_allow_html=True) # Espaçamento invisível para descer os botões
         c_ano, c_mes = st.columns([1, 3])
         with c_ano:
             ano_selecionado = st.selectbox("Ano", [2026, 2027], index=0, label_visibility="collapsed")
@@ -468,8 +475,10 @@ with st.container(border=True):
             nome_divida = str(row[col_nome_div]).strip() if col_nome_div and pd.notna(row[col_nome_div]) else ""
             credor_nome = str(row[col_credor_div]).strip() if col_credor_div and pd.notna(row[col_credor_div]) else ""
             
-            if not nome_divida or nome_divida.lower() == 'nan': nome_divida = credor_nome
-            if not credor_nome or credor_nome.lower() == 'nan': credor_nome = nome_divida
+            if not nome_divida or nome_divida.lower() == 'nan':
+                nome_divida = credor_nome
+            if not credor_nome or credor_nome.lower() == 'nan':
+                credor_nome = nome_divida
             if not nome_divida or nome_divida.lower() == 'nan': continue
             
             val_total = limpar_valor(row[col_val_total_div]) if col_val_total_div else 0.0
@@ -492,6 +501,10 @@ with st.container(border=True):
             total_pago = 0.0
             
             if is_acordado and not df_saidas.empty and col_desc_sai:
+                df_saidas_parc = df_saidas.copy()
+                if not mask_parcelamentos.empty and mask_parcelamentos.any():
+                    df_saidas_parc = df_saidas[mask_parcelamentos].copy()
+                
                 credor_alvo = credor_nome.strip().lower()
                 
                 def match_linha_saida(row_sai):
@@ -499,7 +512,7 @@ with st.container(border=True):
                     if not val_desc: return False
                     return (credor_alvo == val_desc) or (credor_alvo in val_desc) or (val_desc in credor_alvo)
                 
-                df_matches = df_saidas[df_saidas.apply(match_linha_saida, axis=1)]
+                df_matches = df_saidas_parc[df_saidas_parc.apply(match_linha_saida, axis=1)]
                 
                 if not df_matches.empty:
                     total_pago = df_matches['Valor_Clean'].sum()
@@ -517,7 +530,6 @@ with st.container(border=True):
                                 if p_tot > 1:
                                     num_parc_total = p_tot
                             except: pass
-                    
                     if qtd_pagas == 0:
                         qtd_pagas = len(df_matches)
             
