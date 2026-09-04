@@ -70,6 +70,7 @@ st.markdown("""
     .kpi-card-orange { border-left-color: #FF5722; }
     .kpi-card-green { border-left-color: #10B981; }
     .kpi-card-blue { border-left-color: #0284C7; }
+    .kpi-card-purple { border-left-color: #8B5CF6; }
 
     .kpi-title { font-size: 0.8rem; font-weight: 700; color: #64748B; text-transform: uppercase; margin-bottom: 4px; }
     .kpi-value-main { font-size: 1.6rem; font-weight: 800; color: #0F172A; }
@@ -87,7 +88,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- FUNÇÕES DE LIMPEZA E SELEÇÃO DE COLUNAS ---
+# --- FUNÇÕES DE LIMPEZA E BUSCA DINÂMICA ---
 def limpar_valor(val):
     if pd.isna(val): return 0.0
     if isinstance(val, (int, float)): return float(val)
@@ -103,10 +104,10 @@ def fmt_brl(valor):
 
 def obter_coluna_valor_principal(df):
     if df.empty: return None
-    # Seleciona colunas com 'valor' ou 'total', desconsiderando colunas de 'juros'
+    # Pula colunas que tenham 'juros' no nome
     cols = [c for c in df.columns if any(p in c.lower() for p in ['valor', 'total', 'receber', 'saldo']) and 'juros' not in c.lower()]
     if cols:
-        return cols[-1] # Pega a coluna final de valor
+        return cols[-1]
     return df.columns[-1]
 
 # --- CONEXÃO COM A PLANILHA DO GOOGLE ---
@@ -176,10 +177,11 @@ if total_entradas_vr == 0: total_entradas_vr = 682.50
 if entradas_salario_pix == 0: entradas_salario_pix = 2052.30
 if entradas_adiantamento_pix == 0: entradas_adiantamento_pix = 1850.00
 
-total_receita_conta = entradas_salario_pix + entradas_adiantamento_pix
-
 # 2. SAÍDAS E GASTOS ESSENCIAIS
 total_saidas_pix = 0.0
+saidas_salario_pix = 0.0
+saidas_adiantamento_pix = 0.0
+
 gasto_gasolina_vr = 0.0
 gasto_gasolina_pix = 0.0
 gasto_lucca_vr = 0.0
@@ -193,17 +195,23 @@ if not df_saidas.empty:
         cols_tipo_pag = [c for c in df_saidas.columns if any(p in c.lower() for p in ['pagamento', 'meio', 'forma'])]
         col_tipo_pag = cols_tipo_pag[0] if cols_tipo_pag else df_saidas.columns[3]
         
-        cols_tipo_gasto = [c for c in df_saidas.columns if any(p in c.lower() for p in ['tipo de gasto', 'categoria'])]
-        col_tipo_gasto = cols_tipo_gasto[0] if cols_tipo_gasto else df_saidas.columns[1]
+        col_data = [c for c in df_saidas.columns if 'data' in c.lower()][0]
+        df_saidas['Dia'] = pd.to_datetime(df_saidas[col_data], format='%d/%m/%Y', errors='coerce').dt.day
         
+        # Filtros PIX vs VR
         txt_sai = df_saidas.astype(str).agg(' '.join, axis=1)
-        
-        # Filtro de Saídas em PIX
-        mask_sai_pix = df_saidas[col_tipo_pag].astype(str).str.contains('PIX|Dinheiro|Conta|Débito|Debito', case=False, na=False)
-        total_saidas_pix = df_saidas[mask_sai_pix]['Valor_Clean'].sum()
-        
+        mask_sai_pix = df_saidas[col_tipo_pag].astype(str).str.contains('PIX|Dinheiro|Conta|Débito|Debito', case=False, na=False) | txt_sai.str.contains('PIX', case=False, na=False)
         mask_sai_vr = df_saidas[col_tipo_pag].astype(str).str.contains('VR|Flash|Crédito', case=False, na=False)
         
+        total_saidas_pix = df_saidas[mask_sai_pix]['Valor_Clean'].sum()
+        
+        # Separação por Janela baseada no dia (Dia 1 até 14 = Salário, Dia 15 até 31 = Adiantamento)
+        # Fallback: Se não conseguir ler o dia, trata como dia 1 (Salário)
+        df_saidas['Dia'] = df_saidas['Dia'].fillna(1)
+        saidas_salario_pix = df_saidas[mask_sai_pix & (df_saidas['Dia'] < 15)]['Valor_Clean'].sum()
+        saidas_adiantamento_pix = df_saidas[mask_sai_pix & (df_saidas['Dia'] >= 15)]['Valor_Clean'].sum()
+        
+        # Essenciais
         mask_gasolina = txt_sai.str.contains('Gasolina', case=False, na=False)
         mask_lucca = txt_sai.str.contains('Lucca|Fralda|Leite', case=False, na=False)
         
@@ -216,9 +224,11 @@ if not df_saidas.empty:
         pass
 
 sobra_liquida = total_entradas_pix - total_saidas_pix
+sobra_salario = entradas_salario_pix - saidas_salario_pix
+sobra_adiantamento = entradas_adiantamento_pix - saidas_adiantamento_pix
 
 # --- 1. RESUMO EXECUTIVO ---
-st.markdown("### 📊 Resumo Executivo")
+st.markdown("### 📊 Resumo Executivo Geral")
 c1, c2, c3, c4 = st.columns(4)
 
 with c1:
@@ -228,11 +238,58 @@ with c2:
 with c3:
     st.markdown(f'<div class="kpi-card-box kpi-card-orange"><div class="kpi-title">Total Saídas PIX</div><div class="kpi-value-main" style="color:#FF5722;">{fmt_brl(total_saidas_pix)}</div><div class="kpi-subtext">Todos os gastos em conta</div></div>', unsafe_allow_html=True)
 with c4:
-    st.markdown(f'<div class="kpi-card-box kpi-card-green"><div class="kpi-title">Sobra Líquida</div><div class="kpi-value-main" style="color:#10B981;">{fmt_brl(sobra_liquida)}</div><div class="kpi-subtext">Entradas PIX - Saídas PIX</div></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="kpi-card-box kpi-card-green"><div class="kpi-title">Sobra do Mês</div><div class="kpi-value-main" style="color:#10B981;">{fmt_brl(sobra_liquida)}</div><div class="kpi-subtext">Entradas PIX - Saídas PIX</div></div>', unsafe_allow_html=True)
 
-st.markdown("<div style='margin-bottom:15px;'></div>", unsafe_allow_html=True)
+# --- 2. DETALHAMENTO DE SOBRA POR JANELA (SALÁRIO VS ADIANTAMENTO) ---
+with st.container(border=True):
+    st.markdown('<div class="card-header-navy">📅 DETALHAMENTO DE ENTRADAS, SAÍDAS E SOBRAS POR JANELA DE PAGAMENTO (PIX)</div>', unsafe_allow_html=True)
+    cj1, cj2 = st.columns(2)
+    
+    with cj1:
+        st.markdown(f"""
+        <div style="background:#F8FAFC; padding:16px; border-radius:8px; border:1px solid #E2E8F0;">
+            <div style="font-size:1.1rem; font-weight:800; color:#0F172A; margin-bottom:12px; border-bottom:1px solid #CBD5E1; padding-bottom:6px;">
+                💳 Janela Salário (Dia 05)
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                <span style="color:#334155; font-weight:600;">Entrada Salário (PIX):</span>
+                <span style="color:#0284C7; font-weight:800; font-size:1.05rem;">{fmt_brl(entradas_salario_pix)}</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                <span style="color:#334155; font-weight:600;">O que eu gastei (PIX):</span>
+                <span style="color:#FF5722; font-weight:800; font-size:1.05rem;">- {fmt_brl(saidas_salario_pix)}</span>
+            </div>
+            <div style="background-color:#E2E8F0; height:1px; width:100%; margin:10px 0;"></div>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span style="color:#0F172A; font-weight:800; font-size:1.1rem;">💰 Quanto Sobrou:</span>
+                <span style="color:#10B981; font-weight:800; font-size:1.4rem;">{fmt_brl(sobra_salario)}</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
-# --- 2. CAIXINHA DE ESSENCIAIS MENSAIS ---
+    with cj2:
+        st.markdown(f"""
+        <div style="background:#F8FAFC; padding:16px; border-radius:8px; border:1px solid #E2E8F0;">
+            <div style="font-size:1.1rem; font-weight:800; color:#0F172A; margin-bottom:12px; border-bottom:1px solid #CBD5E1; padding-bottom:6px;">
+                💳 Janela Adiantamento (Dia 15)
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                <span style="color:#334155; font-weight:600;">Entrada Adiantamento (PIX):</span>
+                <span style="color:#0284C7; font-weight:800; font-size:1.05rem;">{fmt_brl(entradas_adiantamento_pix)}</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                <span style="color:#334155; font-weight:600;">O que eu gastei (PIX):</span>
+                <span style="color:#FF5722; font-weight:800; font-size:1.05rem;">- {fmt_brl(saidas_adiantamento_pix)}</span>
+            </div>
+            <div style="background-color:#E2E8F0; height:1px; width:100%; margin:10px 0;"></div>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span style="color:#0F172A; font-weight:800; font-size:1.1rem;">💰 Quanto Sobrou:</span>
+                <span style="color:#10B981; font-weight:800; font-size:1.4rem;">{fmt_brl(sobra_adiantamento)}</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+# --- 3. CAIXINHA DE ESSENCIAIS MENSAIS ---
 caixinha_gasolina = 400.00
 caixinha_lucca = 480.00
 caixinha_total = caixinha_gasolina + caixinha_lucca
@@ -301,34 +358,9 @@ with st.container(border=True):
         </div>
         """, unsafe_allow_html=True)
 
-# --- 3. RECEITA OPERACIONAL E JANELAS ---
-with st.container(border=True):
-    st.markdown('<div class="card-header-navy">📈 RECEITA OPERACIONAL EM CONTA & JANELAS (A PARTIR DE SET/2026)</div>', unsafe_allow_html=True)
-    col_rec_chart, col_rec_box = st.columns([2, 1])
-
-    with col_rec_chart:
-        df_rec_hist = pd.DataFrame({'Mês': ['Set/26', 'Out/26', 'Nov/26', 'Dez/26'], 'Receita': [total_entradas_pix, 0, 0, 0]})
-        fig_rec = px.bar(df_rec_hist, x='Mês', y='Receita', text_auto='.2s', color_discrete_sequence=['#0F172A'])
-        fig_rec.update_layout(height=210, margin=dict(l=5, r=5, t=10, b=10), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', xaxis_title="", yaxis_title="")
-        st.plotly_chart(fig_rec, use_container_width=True, config={'displayModeBar': False})
-
-    with col_rec_box:
-        st.markdown(f"""
-        <div style="background:#F8FAFC; padding:16px; border-radius:8px; border:1px solid #E2E8F0;">
-            <div style="font-size:0.85rem; font-weight:bold; color:#0F172A; margin-bottom:2px;">📅 Janela Salário (04/09)</div>
-            <div style="font-size:1.2rem; font-weight:800; color:#10B981;">{fmt_brl(entradas_salario_pix)}</div>
-            <hr style="margin:6px 0; border:0.5px solid #E2E8F0;">
-            <div style="font-size:0.85rem; font-weight:bold; color:#0F172A; margin-bottom:2px;">📅 Janela Adiantamento (15/09)</div>
-            <div style="font-size:1.2rem; font-weight:800; color:#0284C7;">{fmt_brl(entradas_adiantamento_pix)}</div>
-            <hr style="margin:6px 0; border:0.5px solid #E2E8F0;">
-            <div style="font-size:0.85rem; font-weight:bold; color:#0F172A; margin-bottom:2px;">💰 Total Receita Operacional (Conta)</div>
-            <div style="font-size:1.35rem; font-weight:800; color:#0F172A;">{fmt_brl(total_receita_conta)}</div>
-        </div>
-        """, unsafe_allow_html=True)
-
 # --- 4. MAPA DE DÍVIDAS E STATUS DE ACORDO ---
 with st.container(border=True):
-    st.markdown('<div class="card-header-navy">💳 MAPEAMENTO GERAL DE DÍVIDAS & ACOMPANHAMENTO DE PARCELAS PAGAS (VINCULADO ÁS SAÍDAS)</div>', unsafe_allow_html=True)
+    st.markdown('<div class="card-header-navy">💳 MAPEAMENTO GERAL DE DÍVIDAS & ACOMPANHAMENTO DE PARCELAS PAGAS</div>', unsafe_allow_html=True)
 
     if not df_dividas.empty:
         try:
@@ -336,28 +368,28 @@ with st.container(border=True):
             col_val_div = obter_coluna_valor_principal(df_dividas)
             df_dividas['Val_Clean'] = df_dividas[col_val_div].apply(limpar_valor)
             
-            txt_saidas_full = df_saidas.astype(str).agg(' '.join, axis=1) if not df_saidas.empty else pd.Series(dtype=str)
-            
             acordos_rastreados = []
             for idx, row in df_dividas.iterrows():
                 credor = str(row[col_nome_div])
                 txt_row = ' '.join(row.astype(str)).lower()
                 is_acordado = any(term in txt_row for term in ['sim', 'ativo', 'acordad', 'parcelad', 'ok', '36x'])
                 
-                if not txt_saidas_full.empty:
-                    mask_match = txt_saidas_full.str.contains(credor, case=False, na=False)
+                qtd_pagas, total_pago = 0, 0.0
+                if not df_saidas.empty:
+                    col_desc_sai = [c for c in df_saidas.columns if any(p in c.lower() for p in ['descrição', 'descricao', 'gasto', 'detalhe'])][0]
+                    mask_match = df_saidas[col_desc_sai].astype(str).str.contains(credor, case=False, na=False)
                     qtd_pagas = mask_match.sum()
                     total_pago = df_saidas[mask_match]['Valor_Clean'].sum()
-                else:
-                    qtd_pagas, total_pago = 0, 0.0
                 
                 val_total = row['Val_Clean']
                 
                 cols_num_parc = [c for c in df_dividas.columns if any(p in c.lower() for p in ['nº', 'num', 'parcelas', 'qtd'])]
-                if cols_num_parc and pd.notna(row[cols_num_parc[0]]) and limpar_valor(row[cols_num_parc[0]]) > 0:
-                    num_parc = int(limpar_valor(row[cols_num_parc[0]]))
-                else:
-                    num_parc = 36 if is_acordado else 1
+                num_parc = 1
+                if cols_num_parc and pd.notna(row[cols_num_parc[0]]):
+                    v = limpar_valor(row[cols_num_parc[0]])
+                    if v > 0: num_parc = int(v)
+                if is_acordado and num_parc == 1:
+                    num_parc = 36 # Default fallback
                 
                 saldo_restante = max(0.0, val_total - total_pago)
                 
@@ -385,7 +417,7 @@ with st.container(border=True):
                 labels={'Valor_Total': 'Saldo Devedor (R$)', 'Status_Grupo': 'Status'}
             )
             fig_div.update_layout(
-                height=280,
+                height=300,
                 margin=dict(l=10, r=10, t=10, b=10),
                 paper_bgcolor='rgba(0,0,0,0)',
                 plot_bgcolor='rgba(0,0,0,0)',
@@ -395,7 +427,7 @@ with st.container(border=True):
             )
             st.plotly_chart(fig_div, use_container_width=True, config={'displayModeBar': False})
             
-            st.markdown("##### 📌 Status dos Parcelamentos dos Acordos (Atualizado via Saídas)")
+            st.markdown("##### 📌 Status dos Acordos (Lidos automaticamente da aba Saídas)")
             df_somente_acordos = df_acordos_df[df_acordos_df['Is_Acordado']]
             
             if not df_somente_acordos.empty:
@@ -423,32 +455,37 @@ with st.container(border=True):
     else:
         st.write("Sincronizando dados de dívidas da planilha...")
 
-# --- 5. GRÁFICO DE PORCENTAGEM SEPARADO POR TIPO DE GASTO ---
+# --- 5. GRÁFICO EM BARRA POR TIPO DE GASTO ---
 with st.container(border=True):
-    st.markdown('<div class="card-header-navy">🍩 DISTRIBUIÇÃO PERCENTUAL POR TIPO DE GASTO</div>', unsafe_allow_html=True)
+    st.markdown('<div class="card-header-navy">📊 DISTRIBUIÇÃO DE GASTOS POR TIPO DE SAÍDA (PIX E VR)</div>', unsafe_allow_html=True)
 
     if not df_saidas.empty:
         try:
             cols_tg = [c for c in df_saidas.columns if any(p in c.lower() for p in ['tipo de gasto', 'categoria'])]
             col_tg = cols_tg[0] if cols_tg else df_saidas.columns[1]
             
-            df_pie = df_saidas.groupby(col_tg)['Valor_Clean'].sum().reset_index()
+            df_bar = df_saidas.groupby(col_tg)['Valor_Clean'].sum().reset_index()
+            df_bar = df_bar.sort_values(by='Valor_Clean', ascending=True)
             
-            fig_pie = px.pie(
-                df_pie,
-                values='Valor_Clean',
-                names=col_tg,
-                hole=0.5,
+            fig_bar_tg = px.bar(
+                df_bar,
+                y=col_tg,
+                x='Valor_Clean',
+                orientation='h',
+                text_auto='.2s',
+                color=col_tg,
                 color_discrete_sequence=['#FF5722', '#10B981', '#0284C7', '#0F172A', '#8B5CF6', '#F59E0B']
             )
-            fig_pie.update_traces(textposition='inside', textinfo='percent+label')
-            fig_pie.update_layout(
-                height=280,
+            fig_bar_tg.update_layout(
+                height=300,
                 margin=dict(l=10, r=10, t=10, b=10),
                 paper_bgcolor='rgba(0,0,0,0)',
-                showlegend=True
+                plot_bgcolor='rgba(0,0,0,0)',
+                xaxis_title="Total Gasto (R$)",
+                yaxis_title="",
+                showlegend=False
             )
-            st.plotly_chart(fig_pie, use_container_width=True, config={'displayModeBar': False})
+            st.plotly_chart(fig_bar_tg, use_container_width=True, config={'displayModeBar': False})
         except Exception:
             st.write("Processando distribuição de saídas...")
     else:
