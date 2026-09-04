@@ -16,7 +16,6 @@ st.set_page_config(
 # --- ESTILIZAÇÃO CSS EXECUTIVA ---
 st.markdown("""
 <style>
-    /* Estilo global da página */
     .stApp {
         background-color: #EAEFF5 !important;
         font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
@@ -26,7 +25,6 @@ st.markdown("""
     [data-testid="collapsedControl"] {display: none;}
     section[data-testid="stSidebar"] {display: none;}
     
-    /* Customização dos Containers Nativos em Caixas Fechadas */
     [data-testid="stVerticalBlockBorderWrapper"] {
         background-color: #FFFFFF !important;
         border-radius: 10px !important;
@@ -37,12 +35,10 @@ st.markdown("""
         margin-bottom: 15px !important;
     }
     
-    /* Preenchimento interno das caixas */
     [data-testid="stVerticalBlockBorderWrapper"] > div {
         padding: 14px 18px !important;
     }
 
-    /* Faixas de Cabeçalho dos Cards */
     .card-header-navy {
         background: linear-gradient(90deg, #0F172A 0%, #1E293B 100%);
         color: #FFFFFF;
@@ -63,7 +59,6 @@ st.markdown("""
         margin: -14px -18px 14px -18px;
     }
 
-    /* KPI Cards Box (Resumo Executivo) */
     .kpi-card-box {
         background: #FFFFFF;
         padding: 16px;
@@ -80,7 +75,6 @@ st.markdown("""
     .kpi-value-main { font-size: 1.6rem; font-weight: 800; color: #0F172A; }
     .kpi-subtext { font-size: 0.8rem; font-weight: 600; color: #64748B; margin-top: 2px; }
     
-    /* Estilização das caixinhas de mês (Radio horizontal) */
     div.row-widget.stRadio > div { flex-direction: row; flex-wrap: wrap; gap: 8px; }
     div.row-widget.stRadio > div > label { 
         background-color: #FFFFFF; border: 1px solid #CBD5E1; 
@@ -93,7 +87,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- FUNÇÕES DE LIMPEZA E BUSCA DINÂMICA ---
+# --- FUNÇÕES DE LIMPEZA E SELEÇÃO DE COLUNAS ---
 def limpar_valor(val):
     if pd.isna(val): return 0.0
     if isinstance(val, (int, float)): return float(val)
@@ -107,11 +101,12 @@ def fmt_brl(valor):
     try: return f"R$ {float(valor):,.2f}".replace(',', 'v').replace('.', ',').replace('v', '.')
     except: return "R$ 0,00"
 
-def obter_coluna_valor(df):
+def obter_coluna_valor_principal(df):
     if df.empty: return None
-    for col in df.columns:
-        if any(p in col.lower() for p in ['valor', 'total', 'receber', 'saldo', 'quantia', 'parcela']):
-            return col
+    # Seleciona colunas com 'valor' ou 'total', desconsiderando colunas de 'juros'
+    cols = [c for c in df.columns if any(p in c.lower() for p in ['valor', 'total', 'receber', 'saldo']) and 'juros' not in c.lower()]
+    if cols:
+        return cols[-1] # Pega a coluna final de valor
     return df.columns[-1]
 
 # --- CONEXÃO COM A PLANILHA DO GOOGLE ---
@@ -158,7 +153,7 @@ entradas_adiantamento_pix = 0.0
 
 if not df_entradas.empty:
     try:
-        col_val_ent = obter_coluna_valor(df_entradas)
+        col_val_ent = obter_coluna_valor_principal(df_entradas)
         df_entradas['Valor_Clean'] = df_entradas[col_val_ent].apply(limpar_valor)
         txt_ent = df_entradas.astype(str).agg(' '.join, axis=1)
         
@@ -192,15 +187,19 @@ gasto_lucca_pix = 0.0
 
 if not df_saidas.empty:
     try:
-        col_val_sai = obter_coluna_valor(df_saidas)
+        col_val_sai = obter_coluna_valor_principal(df_saidas)
         df_saidas['Valor_Clean'] = df_saidas[col_val_sai].apply(limpar_valor)
         
         cols_tipo_pag = [c for c in df_saidas.columns if any(p in c.lower() for p in ['pagamento', 'meio', 'forma'])]
-        col_tipo_pag = cols_tipo_pag[0] if cols_tipo_pag else df_saidas.columns[2]
+        col_tipo_pag = cols_tipo_pag[0] if cols_tipo_pag else df_saidas.columns[3]
+        
+        cols_tipo_gasto = [c for c in df_saidas.columns if any(p in c.lower() for p in ['tipo de gasto', 'categoria'])]
+        col_tipo_gasto = cols_tipo_gasto[0] if cols_tipo_gasto else df_saidas.columns[1]
         
         txt_sai = df_saidas.astype(str).agg(' '.join, axis=1)
         
-        mask_sai_pix = df_saidas[col_tipo_pag].astype(str).str.contains('PIX|Dinheiro|Conta|Débito|Debito', case=False, na=False) | txt_sai.str.contains('PIX', case=False, na=False)
+        # Filtro de Saídas em PIX
+        mask_sai_pix = df_saidas[col_tipo_pag].astype(str).str.contains('PIX|Dinheiro|Conta|Débito|Debito', case=False, na=False)
         total_saidas_pix = df_saidas[mask_sai_pix]['Valor_Clean'].sum()
         
         mask_sai_vr = df_saidas[col_tipo_pag].astype(str).str.contains('VR|Flash|Crédito', case=False, na=False)
@@ -215,11 +214,6 @@ if not df_saidas.empty:
         gasto_lucca_pix = df_saidas[mask_lucca & mask_sai_pix]['Valor_Clean'].sum()
     except Exception:
         pass
-
-if df_saidas.empty or total_saidas_pix == 0:
-    total_saidas_pix = 287.24
-    if gasto_gasolina_vr == 0 and gasto_gasolina_pix == 0: gasto_gasolina_vr = 50.00
-    if gasto_lucca_vr == 0 and gasto_lucca_pix == 0: gasto_lucca_vr = 38.90
 
 sobra_liquida = total_entradas_pix - total_saidas_pix
 
@@ -339,7 +333,7 @@ with st.container(border=True):
     if not df_dividas.empty:
         try:
             col_nome_div = [c for c in df_dividas.columns if any(p in c.lower() for p in ['credor', 'nome', 'dívida', 'divida'])][0]
-            col_val_div = obter_coluna_valor(df_dividas)
+            col_val_div = obter_coluna_valor_principal(df_dividas)
             df_dividas['Val_Clean'] = df_dividas[col_val_div].apply(limpar_valor)
             
             txt_saidas_full = df_saidas.astype(str).agg(' '.join, axis=1) if not df_saidas.empty else pd.Series(dtype=str)
