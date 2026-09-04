@@ -18,7 +18,7 @@ st.set_page_config(
 st.markdown("""
 <style>
     .block-container {
-        padding-top: 1.5rem !important;
+        padding-top: 1.2rem !important;
         padding-bottom: 3rem !important;
         max-width: 95% !important;
     }
@@ -82,6 +82,30 @@ st.markdown("""
     .kpi-value-main { font-size: 1.8rem; font-weight: 800; color: #0F172A; }
     .kpi-subtext { font-size: 0.85rem; font-weight: 600; color: #64748B; margin-top: 4px; }
     
+    /* Balão de fala do Avatar */
+    .speech-bubble {
+        position: relative;
+        background: #F8FAFC;
+        border-radius: 10px;
+        padding: 10px 14px;
+        border: 1px solid #CBD5E1;
+        font-size: 0.88rem;
+        color: #1E293B;
+    }
+    
+    /* Avatar circular estilizado */
+    .avatar-frame {
+        width: 75px;
+        height: 75px;
+        border-radius: 50%;
+        object-fit: cover;
+        box-shadow: 0 3px 8px rgba(0,0,0,0.15);
+    }
+    
+    html {
+        scroll-behavior: smooth;
+    }
+
     div[data-testid="stRadio"] > div { flex-direction: row; flex-wrap: wrap; gap: 8px; }
     div[data-testid="stRadio"] div[role="radiogroup"] > label { 
         background-color: #F8FAFC; border: 1px solid #CBD5E1; padding: 6px 14px; border-radius: 6px; 
@@ -147,20 +171,7 @@ df_dividas_fixas = carregar_aba(["Custos/parcelamentos ativos", "Custos e parcel
 df_entradas = carregar_aba(["Entradas", "Entradas Agosto"])
 df_saidas = carregar_aba(["Saídas", "Saidas"])
 
-# --- HEADER ALINHADO À ESQUERDA ---
-with st.container(border=True):
-    col_titulo, col_filtros = st.columns([1.2, 2])
-    with col_titulo:
-        st.markdown("<h2 style='margin:0; font-size:1.8rem; font-weight:800; color:#0F172A;'>CONTROLE FINANCEIRO<br><span style='color:#FF5722; font-size:1.3rem;'>PAMELLA</span></h2>", unsafe_allow_html=True)
-    with col_filtros:
-        c_ano, c_mes = st.columns([1, 4])
-        with c_ano:
-            ano_selecionado = st.selectbox("Ano", [2026, 2027], index=0)
-        with c_mes:
-            meses_botoes = ["jan.", "fev.", "mar.", "abr.", "mai.", "jun.", "jul.", "ago.", "set.", "out.", "nov.", "dez."]
-            mes_selecionado = st.radio("Mês", meses_botoes, index=8, horizontal=True)
-
-# --- MAPEAMENTO BLINDADO DE COLUNAS DE SAÍDAS ---
+# --- PROCESSAMENTO PRÉVIO DE ENTRADAS E SAÍDAS PARA O DIAGNÓSTICO DO TOPO ---
 col_desc_sai = obter_coluna_por_termo(df_saidas, ['descrição do gasto', 'descrição', 'descricao'])
 col_parc_sai = obter_coluna_por_termo(df_saidas, ['parcelamento', 'parcela'])
 col_tipo_gasto_sai = obter_coluna_por_termo(df_saidas, ['tipo de gasto', 'categoria'])
@@ -176,7 +187,6 @@ if not df_saidas.empty and col_val_sai:
     else:
         df_saidas['Dia'] = 1
 
-# --- PROCESSAMENTO DE ENTRADAS ---
 total_entradas_pix, total_entradas_vr = 0.0, 0.0
 entradas_salario_pix, entradas_adiantamento_pix = 0.0, 0.0
 
@@ -203,7 +213,6 @@ if entradas_salario_pix == 0: entradas_salario_pix = 2052.30
 if entradas_adiantamento_pix == 0: entradas_adiantamento_pix = 1850.00
 total_receita_conta = entradas_salario_pix + entradas_adiantamento_pix
 
-# --- PROCESSAMENTO DE SAÍDAS E ESSENCIAIS ---
 total_saidas_pix, saidas_salario_pix, saidas_adiantamento_pix = 0.0, 0.0, 0.0
 gasto_gasolina_vr, gasto_gasolina_pix = 0.0, 0.0
 gasto_lucca_vr, gasto_lucca_pix = 0.0, 0.0
@@ -216,7 +225,6 @@ if not df_saidas.empty and col_tipo_pag_sai:
         mask_sai_vr = df_saidas[col_tipo_pag_sai].astype(str).str.contains('VR|Flash|Crédito', case=False, na=False)
         
         total_saidas_pix = df_saidas[mask_sai_pix]['Valor_Clean'].sum()
-        
         saidas_salario_pix = df_saidas[mask_sai_pix & (df_saidas['Dia'] < 15)]['Valor_Clean'].sum()
         saidas_adiantamento_pix = df_saidas[mask_sai_pix & (df_saidas['Dia'] >= 15)]['Valor_Clean'].sum()
         
@@ -241,9 +249,58 @@ sobra_liquida = total_entradas_pix - total_saidas_pix
 sobra_salario = entradas_salario_pix - saidas_salario_pix
 sobra_adiantamento = entradas_adiantamento_pix - saidas_adiantamento_pix
 
-# ====================================================================
-# ORDEM FIXADA DOS QUADROS (BLINDADA)
-# ====================================================================
+# CALCULO DO DIAGNÓSTICO DO SEMÁFORO DA ASSISTENTE
+pct_gasto_total = (total_saidas_pix / total_entradas_pix) * 100 if total_entradas_pix > 0 else 100
+dia_atual = datetime.now().day
+
+if pct_gasto_total <= 60 and dia_atual <= 15:
+    cor_semaforo = "#10B981"
+    border_semaforo = "#10B981"
+    status_texto = "🟢 Mês sob controle!"
+    assistente_expressao = "👍 (Assistente Feliz)"
+elif pct_gasto_total > 75 or (pct_gasto_total > 50 and dia_atual <= 10):
+    cor_semaforo = "#FF5722"
+    border_semaforo = "#FF5722"
+    status_texto = "🔴 Alerta de Gastos!"
+    assistente_expressao = "😟 (Assistente Preocupada)"
+else:
+    cor_semaforo = "#F59E0B"
+    border_semaforo = "#F59E0B"
+    status_texto = "🟡 Atenção ao orçamento!"
+    assistente_expressao = "😐 (Assistente Atenta)"
+
+# URL da Imagem do Avatar
+URL_AVATAR = "https://raw.githubusercontent.com/pamellacastro/central-financeira/main/avatar.png"
+
+# --- HEADER COM AVATAR, BALÃO DE FALA E FILTROS ---
+with st.container(border=True):
+    col_av, col_tit, col_filtros = st.columns([0.8, 2.2, 2.2])
+    
+    with col_av:
+        st.markdown(f"""
+        <div style="text-align:center;">
+            <img src="https://i.ibb.co/3ykGkPn/avatar-pamella.png" class="avatar-frame" style="border: 4px solid {border_semaforo};" onError="this.onerror=null;this.src='https://cdn-icons-png.flaticon.com/512/4140/4140048.png';">
+        </div>
+        """, unsafe_allow_html=True)
+        
+    with col_tit:
+        st.markdown(f"""
+        <h2 style='margin:0; font-size:1.6rem; font-weight:800; color:#0F172A;'>CONTROLE FINANCEIRO<br><span style='color:#FF5722; font-size:1.2rem;'>PAMELLA</span></h2>
+        <div class="speech-bubble" style="border-left: 5px solid {cor_semaforo}; margin-top:8px;">
+            <b style="color:{cor_semaforo}; font-size:0.95rem;">{status_texto}</b> <span style="font-size:0.75rem; color:#64748B;">{assistente_expressao}</span><br>
+            <span style="font-size:0.82rem; color:#334155;">
+                Caso queira saber mais, acesse o painel <b>INSIGHTS DA SUA ASSISTENTE</b> <a href="#insights" style="color:#0284C7; font-weight:700; text-decoration:underline;">clicando aqui</a>.
+            </span>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    with col_filtros:
+        c_ano, c_mes = st.columns([1, 4])
+        with c_ano:
+            ano_selecionado = st.selectbox("Ano", [2026, 2027], index=0)
+        with c_mes:
+            meses_botoes = ["jan.", "fev.", "mar.", "abr.", "mai.", "jun.", "jul.", "ago.", "set.", "out.", "nov.", "dez."]
+            mes_selecionado = st.radio("Mês", meses_botoes, index=8, horizontal=True)
 
 # --- 1. RESUMO EXECUTIVO GERAL ---
 with st.container(border=True):
@@ -401,12 +458,12 @@ with st.container(border=True):
                 
                 credor_alvo = credor_nome.strip().lower()
                 
-                def bate_credor_estrito(r_sai):
-                    desc_s = str(r_sai[col_desc_sai]).strip().lower() if col_desc_sai else ""
-                    if not desc_s: return False
-                    return (credor_alvo == desc_s) or (credor_alvo in desc_s) or (desc_s in credor_alvo)
+                def match_linha_saida(row_sai):
+                    val_desc = str(row_sai[col_desc_sai]).strip().lower() if col_desc_sai else ""
+                    if not val_desc: return False
+                    return (credor_alvo == val_desc) or (credor_alvo in val_desc) or (val_desc in credor_alvo)
                 
-                df_matches = df_saidas_parc[df_saidas_parc.apply(bate_credor_estrito, axis=1)]
+                df_matches = df_saidas_parc[df_saidas_parc.apply(match_linha_saida, axis=1)]
                 
                 if not df_matches.empty:
                     total_pago = df_matches['Valor_Clean'].sum()
@@ -467,8 +524,7 @@ Aguardando acordo / negociação para este credor.
     else:
         st.info("Aba 'Dívidas atrasadas' não encontrada ou vazia.")
 
-
-# --- 6. CUSTOS E PARCELAMENTOS ATIVOS (POR JANELA) ---
+# --- 6. CUSTOS E PARCELAMENTOS ATIVOS (SUBDIVISÃO VISUAL) ---
 with st.container(border=True):
     st.markdown('<div class="card-header-navy">✅ CUSTOS / PARCELAMENTOS ATIVOS (POR JANELA)</div>', unsafe_allow_html=True)
 
@@ -564,11 +620,11 @@ with st.container(border=True):
             st.markdown("<div style='font-size:1.1rem; font-weight:800; color:#0F172A; margin-bottom:12px; border-bottom:2px solid #10B981; padding-bottom:6px;'>💳 Pagamentos Janela Salário (Dia 05)</div>", unsafe_allow_html=True)
             
             if salario_fixos:
-                st.markdown("<div style='font-size:0.95rem; font-weight:700; color:#334155; margin-bottom:8px; margin-top:10px; border-bottom:1px dashed #CBD5E1; padding-bottom:4px;'>🔄 Custos Fixos Contínuos</div>", unsafe_allow_html=True)
+                st.markdown("<div style='font-size:0.95rem; font-weight:700; color:#0F172A; background:#E2E8F0; padding:6px 10px; border-radius:6px; margin-bottom:10px; margin-top:10px;'>🔄 Custos Fixos Contínuos</div>", unsafe_allow_html=True)
                 for it in salario_fixos: st.markdown(it, unsafe_allow_html=True)
             
             if salario_parcelados:
-                st.markdown("<div style='font-size:0.95rem; font-weight:700; color:#334155; margin-bottom:8px; margin-top:15px; border-bottom:1px dashed #CBD5E1; padding-bottom:4px;'>🔢 Parcelamentos Ativos</div>", unsafe_allow_html=True)
+                st.markdown("<div style='font-size:0.95rem; font-weight:700; color:#0F172A; background:#E2E8F0; padding:6px 10px; border-radius:6px; margin-bottom:10px; margin-top:15px;'>🔢 Parcelamentos Ativos</div>", unsafe_allow_html=True)
                 for it in salario_parcelados: st.markdown(it, unsafe_allow_html=True)
 
             if not salario_fixos and not salario_parcelados:
@@ -578,11 +634,11 @@ with st.container(border=True):
             st.markdown("<div style='font-size:1.1rem; font-weight:800; color:#0F172A; margin-bottom:12px; border-bottom:2px solid #0284C7; padding-bottom:6px;'>💳 Pagamentos Janela Adiantamento (Dia 15)</div>", unsafe_allow_html=True)
             
             if adiantamento_fixos:
-                st.markdown("<div style='font-size:0.95rem; font-weight:700; color:#334155; margin-bottom:8px; margin-top:10px; border-bottom:1px dashed #CBD5E1; padding-bottom:4px;'>🔄 Custos Fixos Contínuos</div>", unsafe_allow_html=True)
+                st.markdown("<div style='font-size:0.95rem; font-weight:700; color:#0F172A; background:#E2E8F0; padding:6px 10px; border-radius:6px; margin-bottom:10px; margin-top:10px;'>🔄 Custos Fixos Contínuos</div>", unsafe_allow_html=True)
                 for it in adiantamento_fixos: st.markdown(it, unsafe_allow_html=True)
             
             if adiantamento_parcelados:
-                st.markdown("<div style='font-size:0.95rem; font-weight:700; color:#334155; margin-bottom:8px; margin-top:15px; border-bottom:1px dashed #CBD5E1; padding-bottom:4px;'>🔢 Parcelamentos Ativos</div>", unsafe_allow_html=True)
+                st.markdown("<div style='font-size:0.95rem; font-weight:700; color:#0F172A; background:#E2E8F0; padding:6px 10px; border-radius:6px; margin-bottom:10px; margin-top:15px;'>🔢 Parcelamentos Ativos</div>", unsafe_allow_html=True)
                 for it in adiantamento_parcelados: st.markdown(it, unsafe_allow_html=True)
 
             if not adiantamento_fixos and not adiantamento_parcelados:
@@ -590,10 +646,10 @@ with st.container(border=True):
     else:
         st.info("Aba 'Custos/parcelamentos ativos' não encontrada ou vazia.")
 
-
-# --- 7. INSIGHTS DO MÊS E DISTRIBUIÇÃO VISUAL ---
+# --- 7. INSIGHTS EXCLUSIVOS DA SUA ASSISTENTE (ÂNCORA #insights E SEM TREEMAP) ---
+st.markdown('<div id="insights"></div>', unsafe_allow_html=True)
 with st.container(border=True):
-    st.markdown('<div class="card-header-navy">💡 INSIGHTS DA SUA ASSISTENTE & DISTRIBUIÇÃO DE GASTOS</div>', unsafe_allow_html=True)
+    st.markdown('<div class="card-header-navy">💡 INSIGHTS DA SUA ASSISTENTE PESSOAL</div>', unsafe_allow_html=True)
 
     if not df_saidas.empty and total_saidas_pix > 0:
         try:
@@ -604,21 +660,15 @@ with st.container(border=True):
             total_gasto_geral = df_tree['Valor_Clean'].sum()
             df_tree['Porcentagem'] = (df_tree['Valor_Clean'] / total_gasto_geral) * 100
 
-            # Lógica Inteligente de Insights
             maior_cat_row = df_tree.loc[df_tree['Valor_Clean'].idxmax()]
             maior_categoria = maior_cat_row[col_tg]
             maior_valor = maior_cat_row['Valor_Clean']
             pct_maior = maior_cat_row['Porcentagem']
 
-            # Verifica quão rápido estamos gastando o dinheiro no mês
-            pct_gasto_total = (total_saidas_pix / total_entradas_pix) * 100 if total_entradas_pix > 0 else 100
-            dia_atual = datetime.now().day
-
-            # Avaliação de "Saúde" do mês
-            if pct_gasto_total <= 50 and dia_atual <= 15:
-                status_mes = "🟢 <b style='color:#10B981;'>Mês sob controle!</b> Estamos no início do mês e os gastos estão bem moderados. Excelente ritmo."
-            elif pct_gasto_total > 70 and dia_atual <= 15:
-                status_mes = "🔴 <b style='color:#FF5722;'>Alerta Vermelho!</b> Estamos na primeira quinzena e uma grande parte da sua receita já foi comprometida. Sugiro pisar no freio!"
+            if pct_gasto_total <= 60 and dia_atual <= 15:
+                status_mes = "🟢 <b style='color:#10B981;'>Mês sob controle!</b> Estamos no início do mês e os gastos estão bem moderados. Excelente ritmo de economia!"
+            elif pct_gasto_total > 75 or (pct_gasto_total > 50 and dia_atual <= 10):
+                status_mes = "🔴 <b style='color:#FF5722;'>Alerta Vermelho!</b> Estamos na primeira quinzena e uma grande parte da sua receita já foi comprometida. Sugiro pisar no freio nas despesas variáveis."
             elif pct_gasto_total >= 90:
                 status_mes = "🔴 <b style='color:#FF5722;'>Orçamento no Limite!</b> Você está gastando quase tudo que entrou. Evite qualquer compra não essencial agora."
             elif pct_gasto_total < 80 and dia_atual > 15:
@@ -627,34 +677,15 @@ with st.container(border=True):
                 status_mes = "🟡 <b style='color:#F59E0B;'>Atenção Moderada.</b> Os gastos estão acompanhando os dias do mês proporcionalmente. Fique de olho para garantirmos o fechamento no azul."
 
             st.markdown(f"""
-            <div style="background:#F8FAFC; padding:20px; border-radius:10px; border:1px solid #CBD5E1; border-left:6px solid #8B5CF6; margin-bottom:20px;">
-                <div style="font-size:1.15rem; font-weight:800; color:#0F172A; margin-bottom:8px;">Olá, Pamella! Aqui é sua Assistente Pessoal 🙋‍♀️</div>
-                <div style="font-size:0.95rem; color:#334155; line-height:1.6;">
+            <div style="background:#F8FAFC; padding:22px; border-radius:10px; border:1px solid #CBD5E1; border-left:6px solid #0F172A;">
+                <div style="font-size:1.15rem; font-weight:800; color:#0F172A; margin-bottom:10px;">Olá, Pamella! Aqui está sua análise financeira detalhada 🙋‍♀️</div>
+                <div style="font-size:0.95rem; color:#334155; line-height:1.7;">
                     Analisando suas movimentações até hoje (dia {dia_atual}), identifiquei que o seu maior volume de despesas está concentrado na categoria <b>{maior_categoria}</b>, que consumiu <b>{pct_maior:.1f}%</b> dos seus gastos totais até aqui (<b>{fmt_brl(maior_valor)}</b>).<br><br>
-                    <b>Diagnóstico da sua Carteira:</b> {status_mes}<br>
-                    <i style="color:#64748B; font-size:0.85rem;">Obs: Como o mês está em andamento, meu diagnóstico se ajustará automaticamente a cada novo lançamento que você realizar na planilha.</i>
+                    <b>Diagnóstico do Período:</b> {status_mes}<br><br>
+                    <i style="color:#64748B; font-size:0.85rem;">Obs: Como o mês está em andamento, esta análise se atualiza automaticamente conforme você insere novos pagamentos na planilha.</i>
                 </div>
             </div>
             """, unsafe_allow_html=True)
-
-            # --- Treemap Visual ---
-            df_tree['Rotulo'] = df_tree.apply(lambda r: f"<b>{r[col_tg]}</b><br>{r['Porcentagem']:.1f}%<br>{fmt_brl(r['Valor_Clean'])}", axis=1)
-
-            fig_tree = px.treemap(
-                df_tree,
-                path=[px.Constant("Saídas do Mês"), 'Rotulo'],
-                values='Valor_Clean',
-                color='Valor_Clean',
-                color_continuous_scale=['#FF5722', '#0284C7', '#10B981', '#0F172A']
-            )
-            fig_tree.update_traces(root_color="lightgrey")
-            fig_tree.update_layout(
-                height=350,
-                margin=dict(l=10, r=10, t=20, b=10),
-                paper_bgcolor='rgba(0,0,0,0)',
-                coloraxis_showscale=False
-            )
-            st.plotly_chart(fig_tree, use_container_width=True, config={'displayModeBar': False})
         except Exception as e:
             st.write("Processando insights de saídas...", e)
     else:
