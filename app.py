@@ -23,7 +23,7 @@ def get_image_base64(path):
     except Exception:
         return ""
 
-# --- ESTILIZAÇÃO CSS EXECUTIVA COM ESPAÇAMENTOS FIXOS ---
+# --- ESTILIZAÇÃO CSS EXECUTIVA ---
 st.markdown("""
 <style>
     .block-container {
@@ -95,26 +95,53 @@ st.markdown("""
     .kpi-value-main { font-size: 1.8rem; font-weight: 800; color: #0F172A; }
     .kpi-subtext { font-size: 0.85rem; font-weight: 600; color: #64748B; margin-top: 4px; }
     
-    /* Balão de fala e Avatar */
-    .speech-bubble {
-        position: relative;
-        background: #F8FAFC;
-        border-radius: 10px;
-        padding: 12px 16px;
-        border: 1px solid #CBD5E1;
-        font-size: 0.9rem;
-        color: #1E293B;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.03);
-    }
-    
+    /* AVATAR EXPANDIDO */
     .avatar-frame {
-        width: 90px;
-        height: 90px;
+        width: 115px;
+        height: 115px;
         border-radius: 50%;
         object-fit: cover;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-        margin-top: 5px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+        margin-top: 2px;
         transition: all 0.3s ease;
+    }
+    
+    /* BALÃO DE FALA ESTILO HQ (BRANCO SEM CINZA) */
+    .speech-bubble {
+        position: relative;
+        background: #FFFFFF;
+        border-radius: 14px;
+        padding: 12px 18px;
+        border: 2px solid #CBD5E1;
+        font-size: 0.9rem;
+        color: #1E293B;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+        margin-top: 6px;
+        display: inline-block;
+    }
+    
+    /* Ponta do Balão direcionada à assistente */
+    .speech-bubble::after {
+        content: '';
+        position: absolute;
+        left: -10px;
+        top: 22px;
+        width: 0;
+        height: 0;
+        border-top: 8px solid transparent;
+        border-bottom: 8px solid transparent;
+        border-right: 10px solid #FFFFFF;
+    }
+    .speech-bubble::before {
+        content: '';
+        position: absolute;
+        left: -13px;
+        top: 21px;
+        width: 0;
+        height: 0;
+        border-top: 9px solid transparent;
+        border-bottom: 9px solid transparent;
+        border-right: 11px solid #CBD5E1;
     }
     
     div[data-testid="stRadio"] > div { flex-direction: row; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
@@ -287,9 +314,9 @@ else:
 img_base64 = get_image_base64(avatar_file)
 avatar_src = f"data:image/png;base64,{img_base64}" if img_base64 else "https://cdn-icons-png.flaticon.com/512/4140/4140048.png"
 
-# --- HEADER COM AVATAR, BALÃO E FILTROS ---
+# --- HEADER REORGANIZADO E ALINHADO COM BALÃO DE FALA PURO ---
 with st.container(border=True):
-    col_av, col_tit, col_filtros = st.columns([1, 4, 3])
+    col_av, col_tit, col_filtros = st.columns([1.2, 4.2, 3.2])
     
     with col_av:
         st.markdown(f"""
@@ -300,8 +327,8 @@ with st.container(border=True):
         
     with col_tit:
         st.markdown(f"""
-        <h2 style='margin:0; font-size:1.7rem; font-weight:800; color:#0F172A;'>CONTROLE FINANCEIRO <span style='color:#FF5722;'>PAMELLA</span></h2>
-        <div class="speech-bubble" style="border-left: 5px solid {cor_semaforo}; margin-top:5px; display: inline-block;">
+        <h2 style='margin:0; font-size:1.65rem; font-weight:800; color:#0F172A;'>CONTROLE FINANCEIRO <span style='color:#FF5722;'>PAMELLA</span></h2>
+        <div class="speech-bubble">
             <b style="color:{cor_semaforo}; font-size:0.95rem;">{status_texto}</b> <span style="font-size:0.85rem; color:#64748B;">{assistente_expressao}</span><br>
             <span style="font-size:0.85rem; color:#334155;">
                 Caso queira saber mais, acesse o painel <a href="#insights" style="color:#0284C7; font-weight:700; text-decoration:none;">INSIGHTS DA ASSISTENTE clicando aqui</a>.
@@ -441,10 +468,8 @@ with st.container(border=True):
             nome_divida = str(row[col_nome_div]).strip() if col_nome_div and pd.notna(row[col_nome_div]) else ""
             credor_nome = str(row[col_credor_div]).strip() if col_credor_div and pd.notna(row[col_credor_div]) else ""
             
-            if not nome_divida or nome_divida.lower() == 'nan':
-                nome_divida = credor_nome
-            if not credor_nome or credor_nome.lower() == 'nan':
-                credor_nome = nome_divida
+            if not nome_divida or nome_divida.lower() == 'nan': nome_divida = credor_nome
+            if not credor_nome or credor_nome.lower() == 'nan': credor_nome = nome_divida
             if not nome_divida or nome_divida.lower() == 'nan': continue
             
             val_total = limpar_valor(row[col_val_total_div]) if col_val_total_div else 0.0
@@ -474,8 +499,7 @@ with st.container(border=True):
                     if not val_desc: return False
                     return (credor_alvo == val_desc) or (credor_alvo in val_desc) or (val_desc in credor_alvo)
                 
-                mask_matches = df_saidas.apply(match_linha_saida, axis=1)
-                df_matches = df_saidas[mask_matches]
+                df_matches = df_saidas[df_saidas.apply(match_linha_saida, axis=1)]
                 
                 if not df_matches.empty:
                     total_pago = df_matches['Valor_Clean'].sum()
@@ -483,7 +507,6 @@ with st.container(border=True):
                     
                     for _, r_match in df_matches.iterrows():
                         p_str = str(r_match[col_parc_sai]).strip() if col_parc_sai and pd.notna(r_match[col_parc_sai]) else ""
-                        
                         if '/' in p_str:
                             try:
                                 partes = p_str.split('/')
@@ -681,7 +704,6 @@ with st.container(border=True):
             maior_valor = maior_cat_row['Valor_Clean']
             pct_maior = maior_cat_row['Porcentagem']
 
-            # Usa as variáveis já calculadas lá no topo
             if pct_gasto_total <= 60 and dia_atual <= 15:
                 status_mes_bottom = "🟢 <b style='color:#10B981;'>Mês sob controle!</b> Estamos no início do mês e os gastos estão bem moderados. Excelente ritmo de economia!"
             elif pct_gasto_total > 75 or (pct_gasto_total > 50 and dia_atual <= 10):
