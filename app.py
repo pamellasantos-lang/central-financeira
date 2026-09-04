@@ -13,10 +13,16 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- ESTILIZAÇÃO CSS EXECUTIVA COM MAIOR ESPAÇAMENTO ---
+# --- ESTILIZAÇÃO CSS EXECUTIVA E REFINAMENTO DE LAYOUT ---
 st.markdown("""
 <style>
-    /* Estilo global da página */
+    /* Redução do topo da página e margens globais */
+    .block-container {
+        padding-top: 0.8rem !important;
+        padding-bottom: 2rem !important;
+        max-width: 96% !important;
+    }
+    
     .stApp {
         background-color: #EAEFF5 !important;
         font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
@@ -26,75 +32,89 @@ st.markdown("""
     [data-testid="collapsedControl"] {display: none;}
     section[data-testid="stSidebar"] {display: none;}
     
-    /* Customização dos Containers Nativos com maior espaçamento vertical */
+    /* Customização dos Containers Nativos em formato de Cards Fechados */
     [data-testid="stVerticalBlockBorderWrapper"] {
         background-color: #FFFFFF !important;
         border-radius: 10px !important;
         border: 1px solid #CBD5E1 !important;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.06) !important;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.04) !important;
         padding: 0px !important;
         overflow: hidden !important;
-        margin-bottom: 25px !important;
+        margin-bottom: 20px !important;
     }
     
-    /* Preenchimento interno das caixas */
     [data-testid="stVerticalBlockBorderWrapper"] > div {
-        padding: 18px 22px !important;
+        padding: 14px 18px !important;
     }
 
-    /* Faixas de Cabeçalho dos Cards */
+    /* Cabeçalhos estilizados */
     .card-header-navy {
         background: linear-gradient(90deg, #0F172A 0%, #1E293B 100%);
         color: #FFFFFF;
-        padding: 12px 20px;
+        padding: 10px 18px;
         font-weight: 700;
         font-size: 0.95rem;
         text-transform: uppercase;
-        margin: -18px -22px 18px -22px;
+        margin: -14px -18px 14px -18px;
     }
 
     .card-header-orange {
         background: linear-gradient(90deg, #FF5722 0%, #E64A19 100%);
         color: #FFFFFF;
-        padding: 12px 20px;
+        padding: 10px 18px;
         font-weight: 700;
         font-size: 0.95rem;
         text-transform: uppercase;
-        margin: -18px -22px 18px -22px;
+        margin: -14px -18px 14px -18px;
     }
 
     /* KPI Cards Box (Resumo Executivo) */
     .kpi-card-box {
         background: #FFFFFF;
-        padding: 18px;
+        padding: 16px;
         border-radius: 10px;
         box-shadow: 0 4px 10px rgba(0,0,0,0.04);
         border: 1px solid #CBD5E1;
         border-left: 5px solid #0F172A;
-        margin-bottom: 10px;
     }
     .kpi-card-orange { border-left-color: #FF5722; }
     .kpi-card-green { border-left-color: #10B981; }
     .kpi-card-blue { border-left-color: #0284C7; }
 
-    .kpi-title { font-size: 0.82rem; font-weight: 700; color: #64748B; text-transform: uppercase; margin-bottom: 4px; }
-    .kpi-value-main { font-size: 1.65rem; font-weight: 800; color: #0F172A; }
+    .kpi-title { font-size: 0.8rem; font-weight: 700; color: #64748B; text-transform: uppercase; margin-bottom: 4px; }
+    .kpi-value-main { font-size: 1.6rem; font-weight: 800; color: #0F172A; }
     .kpi-subtext { font-size: 0.8rem; font-weight: 600; color: #64748B; margin-top: 2px; }
     
-    /* Caixinhas de seleção de mês */
-    div.row-widget.stRadio > div { flex-direction: row; flex-wrap: wrap; gap: 8px; }
-    div.row-widget.stRadio > div > label { 
-        background-color: #FFFFFF; border: 1px solid #CBD5E1; 
-        padding: 6px 14px; border-radius: 6px; cursor: pointer;
+    /* Quadradinhos clicáveis para seleção de Mês (Sem bolinhas de radio) */
+    div[data-testid="stRadio"] > div { flex-direction: row; flex-wrap: wrap; gap: 6px; }
+    div[data-testid="stRadio"] div[role="radiogroup"] > label { 
+        background-color: #F8FAFC; 
+        border: 1px solid #CBD5E1; 
+        padding: 6px 12px; 
+        border-radius: 6px; 
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 0.85rem;
+        color: #334155;
+        display: flex;
+        align-items: center;
     }
-    div.row-widget.stRadio > div > label[data-checked="true"] {
-        background-color: #0F172A; border-color: #0F172A;
+    /* Oculta as bolinhas do Radio Button */
+    div[data-testid="stRadio"] div[role="radiogroup"] > label > div:first-child {
+        display: none !important;
     }
-    div.row-widget.stRadio > div > label[data-checked="true"] * { color: #FFFFFF !important; }
+    div[data-testid="stRadio"] div[role="radiogroup"] > label[data-checked="true"] { 
+        background-color: #0F172A !important; 
+        border-color: #0F172A !important; 
+        color: #FFFFFF !important;
+    }
+    div[data-testid="stRadio"] div[role="radiogroup"] > label[data-checked="true"] * { 
+        color: #FFFFFF !important; 
+    }
 </style>
 """, unsafe_allow_html=True)
 
-# --- FUNÇÕES DE LIMPEZA E SELEÇÃO DE COLUNAS ---
+# --- FUNÇÕES DE LIMPEZA E TRATAMENTO DE DADOS ---
 def limpar_valor(val):
     if pd.isna(val): return 0.0
     if isinstance(val, (int, float)): return float(val)
@@ -115,7 +135,7 @@ def obter_coluna_valor_principal(df):
         return cols[-1]
     return df.columns[-1]
 
-# --- CONEXÃO COM A PLANILHA DO GOOGLE ---
+# --- CONEXÃO COM A PLANILHA DO GOOGLE SHEETS ---
 SHEET_ID = "1Y7EsUDd9J_liLwwTbRdjM2lM_XcdsWr_kYNUC-MAZsY"
 
 def carregar_aba(nomes_possiveis):
@@ -133,21 +153,20 @@ df_entradas = carregar_aba(["Entradas", "Entradas Agosto"])
 df_saidas = carregar_aba(["Saídas", "Saidas"])
 df_fixas = carregar_aba(["Parcelamentos Fixos"])
 
-# --- HEADER: TÍTULO, ANO E MÊS ---
-col_titulo, col_filtros = st.columns([1.2, 2])
+# --- HEADER NO CARD SUPERIOR COM FILTROS DE ANO E MÊS ---
+with st.container(border=True):
+    col_titulo, col_filtros = st.columns([1.2, 2])
 
-with col_titulo:
-    st.markdown("<h1 style='margin-top:10px; font-size:2.0rem; font-weight:800; color:#0F172A;'>CONTROLE FINANCEIRO<br><span style='color:#FF5722; font-size:1.4rem;'>PAMELLA</span></h1>", unsafe_allow_html=True)
+    with col_titulo:
+        st.markdown("<h2 style='margin:0; font-size:1.8rem; font-weight:800; color:#0F172A;'>CONTROLE FINANCEIRO<br><span style='color:#FF5722; font-size:1.3rem;'>PAMELLA</span></h2>", unsafe_allow_html=True)
 
-with col_filtros:
-    c_ano, c_mes = st.columns([1, 4])
-    with c_ano:
-        ano_selecionado = st.selectbox("Ano", [2026, 2027], index=0)
-    with c_mes:
-        meses = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
-        mes_selecionado = st.radio("Mês", meses, index=8, horizontal=True)
-
-st.markdown("<div style='margin-bottom:20px;'></div>", unsafe_allow_html=True)
+    with col_filtros:
+        c_ano, c_mes = st.columns([1, 4])
+        with c_ano:
+            ano_selecionado = st.selectbox("Ano", [2026, 2027], index=0)
+        with c_mes:
+            meses_quadradinhos = ["jan.", "fev.", "mar.", "abr.", "mai.", "jun.", "jul.", "ago.", "set.", "out.", "nov.", "dez."]
+            mes_selecionado = st.radio("Mês", meses_quadradinhos, index=8, horizontal=True)
 
 # --- PROCESSAMENTO AUTOMÁTICO DE DADOS ---
 
@@ -250,8 +269,6 @@ with c3:
 with c4:
     st.markdown(f'<div class="kpi-card-box kpi-card-green"><div class="kpi-title">Sobra do Mês</div><div class="kpi-value-main" style="color:#10B981;">{fmt_brl(sobra_liquida)}</div><div class="kpi-subtext">Entradas PIX - Saídas PIX</div></div>', unsafe_allow_html=True)
 
-st.markdown("<div style='margin-bottom:20px;'></div>", unsafe_allow_html=True)
-
 # --- 2. DETALHAMENTO DE SOBRA POR JANELA (SALÁRIO VS ADIANTAMENTO) ---
 with st.container(border=True):
     st.markdown('<div class="card-header-navy">📅 DETALHAMENTO DE ENTRADAS, SAÍDAS E SOBRAS POR JANELA DE PAGAMENTO (PIX)</div>', unsafe_allow_html=True)
@@ -300,8 +317,6 @@ with st.container(border=True):
             </div>
         </div>
         """, unsafe_allow_html=True)
-
-st.markdown("<div style='margin-bottom:20px;'></div>", unsafe_allow_html=True)
 
 # --- 3. CAIXINHA DE ESSENCIAIS MENSAIS ---
 caixinha_gasolina = 400.00
@@ -372,62 +387,84 @@ with st.container(border=True):
         </div>
         """, unsafe_allow_html=True)
 
-st.markdown("<div style='margin-bottom:20px;'></div>", unsafe_allow_html=True)
+# --- 4. RECEITA OPERACIONAL EM CONTA & JANELAS DE PAGAMENTO ---
+with st.container(border=True):
+    st.markdown('<div class="card-header-navy">📈 RECEITA OPERACIONAL EM CONTA & JANELAS DE PAGAMENTO</div>', unsafe_allow_html=True)
+    col_rec_chart, col_rec_box = st.columns([2, 1])
 
-# --- 4. MAPA DE DÍVIDAS E STATUS DE ACORDO ---
+    with col_rec_chart:
+        df_rec_hist = pd.DataFrame({'Mês': ['Set/26', 'Out/26', 'Nov/26', 'Dez/26'], 'Receita': [total_entradas_pix, 0, 0, 0]})
+        fig_rec = px.bar(df_rec_hist, x='Mês', y='Receita', text_auto='.2s', color_discrete_sequence=['#0F172A'])
+        fig_rec.update_layout(height=210, margin=dict(l=5, r=5, t=10, b=10), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', xaxis_title="", yaxis_title="")
+        st.plotly_chart(fig_rec, use_container_width=True, config={'displayModeBar': False})
+
+    with col_rec_box:
+        st.markdown(f"""
+        <div style="background:#F8FAFC; padding:16px; border-radius:8px; border:1px solid #CBD5E1;">
+            <div style="font-size:0.85rem; font-weight:bold; color:#0F172A; margin-bottom:2px;">📅 Janela Salário (04/09)</div>
+            <div style="font-size:1.2rem; font-weight:800; color:#10B981;">{fmt_brl(entradas_salario_pix)}</div>
+            <hr style="margin:6px 0; border:0.5px solid #CBD5E1;">
+            <div style="font-size:0.85rem; font-weight:bold; color:#0F172A; margin-bottom:2px;">📅 Janela Adiantamento (15/09)</div>
+            <div style="font-size:1.2rem; font-weight:800; color:#0284C7;">{fmt_brl(entradas_adiantamento_pix)}</div>
+            <hr style="margin:6px 0; border:0.5px solid #CBD5E1;">
+            <div style="font-size:0.85rem; font-weight:bold; color:#0F172A; margin-bottom:2px;">💰 Total Receita Operacional (Conta)</div>
+            <div style="font-size:1.35rem; font-weight:800; color:#0F172A;">{fmt_brl(total_receita_conta)}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+# --- 5. MAPA DE DÍVIDAS E STATUS DE ACORDO ---
 with st.container(border=True):
     st.markdown('<div class="card-header-navy">💳 MAPEAMENTO GERAL DE DÍVIDAS & ACOMPANHAMENTO DE PARCELAS PAGAS</div>', unsafe_allow_html=True)
 
-    try:
-        if not df_dividas.empty:
+    if not df_dividas.empty:
+        try:
             cols_nome = [c for c in df_dividas.columns if any(p in c.lower() for p in ['credor', 'nome', 'dívida', 'divida', 'instituição', 'descrição'])]
             col_nome_div = cols_nome[0] if cols_nome else df_dividas.columns[0]
             
             col_val_div = obter_coluna_valor_principal(df_dividas)
             df_dividas['Val_Clean'] = df_dividas[col_val_div].apply(limpar_valor)
             
-            txt_saidas_full = df_saidas.astype(str).agg(' '.join, axis=1) if not df_saidas.empty else pd.Series(dtype=str)
+            df_dividas_limpa = df_dividas[df_dividas['Val_Clean'] > 0].copy()
             
-            acordos_rastreados = []
-            for idx, row in df_dividas.iterrows():
-                credor = str(row[col_nome_div])
-                if not credor or credor.strip() == '' or pd.isna(row[col_nome_div]):
-                    continue
+            if not df_dividas_limpa.empty:
+                txt_saidas_full = df_saidas.astype(str).agg(' '.join, axis=1) if not df_saidas.empty else pd.Series(dtype=str)
                 
-                txt_row = ' '.join(row.astype(str)).lower()
-                is_acordado = any(term in txt_row for term in ['sim', 'ativo', 'acordad', 'parcelad', 'ok', '36x'])
+                acordos_rastreados = []
+                for idx, row in df_dividas_limpa.iterrows():
+                    credor = str(row[col_nome_div]).strip()
+                    txt_row = ' '.join(row.astype(str)).lower()
+                    is_acordado = any(term in txt_row for term in ['sim', 'ativo', 'acordad', 'parcelad', 'ok', '36x'])
+                    
+                    qtd_pagas, total_pago = 0, 0.0
+                    if not df_saidas.empty:
+                        col_desc_sai = [c for c in df_saidas.columns if any(p in c.lower() for p in ['descrição', 'descricao', 'gasto', 'detalhe'])][0]
+                        mask_match = df_saidas[col_desc_sai].astype(str).str.contains(credor, case=False, na=False)
+                        qtd_pagas = mask_match.sum()
+                        total_pago = df_saidas[mask_match]['Valor_Clean'].sum()
+                    
+                    val_total = row['Val_Clean']
+                    
+                    cols_num_parc = [c for c in df_dividas.columns if any(p in c.lower() for p in ['nº', 'num', 'parcelas', 'qtd'])]
+                    num_parc = 1
+                    if cols_num_parc and pd.notna(row[cols_num_parc[0]]):
+                        v = limpar_valor(row[cols_num_parc[0]])
+                        if v > 0: num_parc = int(v)
+                    if is_acordado and num_parc == 1:
+                        num_parc = 36
+                    
+                    saldo_restante = max(0.0, val_total - total_pago)
+                    
+                    acordos_rastreados.append({
+                        'Credor': credor,
+                        'Valor_Total': val_total,
+                        'Is_Acordado': is_acordado,
+                        'Num_Parcelas': num_parc,
+                        'Parcelas_Pagas': qtd_pagas,
+                        'Total_Pago': total_pago,
+                        'Saldo_Restante': saldo_restante,
+                        'Status_Grupo': 'Acordado (Parcelamento Ativo)' if is_acordado else 'Não Acordado (Pendente)'
+                    })
                 
-                qtd_pagas, total_pago = 0, 0.0
-                if not df_saidas.empty:
-                    col_desc_sai = [c for c in df_saidas.columns if any(p in c.lower() for p in ['descrição', 'descricao', 'gasto', 'detalhe'])][0]
-                    mask_match = df_saidas[col_desc_sai].astype(str).str.contains(credor, case=False, na=False)
-                    qtd_pagas = mask_match.sum()
-                    total_pago = df_saidas[mask_match]['Valor_Clean'].sum()
-                
-                val_total = row['Val_Clean']
-                
-                cols_num_parc = [c for c in df_dividas.columns if any(p in c.lower() for p in ['nº', 'num', 'parcelas', 'qtd'])]
-                num_parc = 1
-                if cols_num_parc and pd.notna(row[cols_num_parc[0]]):
-                    v = limpar_valor(row[cols_num_parc[0]])
-                    if v > 0: num_parc = int(v)
-                if is_acordado and num_parc == 1:
-                    num_parc = 36
-                
-                saldo_restante = max(0.0, val_total - total_pago)
-                
-                acordos_rastreados.append({
-                    'Credor': credor,
-                    'Valor_Total': val_total,
-                    'Is_Acordado': is_acordado,
-                    'Num_Parcelas': num_parc,
-                    'Parcelas_Pagas': qtd_pagas,
-                    'Total_Pago': total_pago,
-                    'Saldo_Restante': saldo_restante,
-                    'Status_Grupo': 'Acordado (Parcelamento Ativo)' if is_acordado else 'Não Acordado (Pendente)'
-                })
-            
-            if acordos_rastreados:
                 df_acordos_df = pd.DataFrame(acordos_rastreados)
                 
                 fig_div = px.bar(
@@ -441,7 +478,7 @@ with st.container(border=True):
                     labels={'Valor_Total': 'Saldo Devedor (R$)', 'Status_Grupo': 'Status'}
                 )
                 fig_div.update_layout(
-                    height=300,
+                    height=280,
                     margin=dict(l=10, r=10, t=10, b=10),
                     paper_bgcolor='rgba(0,0,0,0)',
                     plot_bgcolor='rgba(0,0,0,0)',
@@ -458,7 +495,7 @@ with st.container(border=True):
                     for _, ac_row in df_somente_acordos.iterrows():
                         pct_parc_pago = min(100.0, (ac_row['Parcelas_Pagas'] / ac_row['Num_Parcelas']) * 100) if ac_row['Num_Parcelas'] > 0 else 0
                         st.markdown(f"""
-                        <div style="background:#F8FAFC; padding:14px 18px; border-radius:8px; border:1px solid #CBD5E1; margin-bottom:10px;">
+                        <div style="background:#F8FAFC; padding:12px 16px; border-radius:8px; border:1px solid #CBD5E1; margin-bottom:8px;">
                             <div style="display:flex; justify-content:space-between; align-items:center;">
                                 <span style="font-weight:700; font-size:1.05rem; color:#0F172A;">🤝 Acordo: {ac_row['Credor']}</span>
                                 <span style="background:#0284C7; color:white; padding:4px 12px; border-radius:12px; font-weight:700; font-size:0.85rem;">{ac_row['Parcelas_Pagas']} de {ac_row['Num_Parcelas']} parcelas pagas ({pct_parc_pago:.1f}%)</span>
@@ -475,24 +512,26 @@ with st.container(border=True):
                 else:
                     st.info("Nenhum acordo com status ativo identificado na aba Dívidas.")
             else:
-                st.info("Nenhuma dívida encontrada na aba Dívidas.")
-        else:
-            st.info("Sincronizando registros da aba Dívidas da planilha...")
-    except Exception as e:
-        st.write("Processando mapa de dívidas...")
+                st.info("Sincronizando dados das dívidas...")
+        except Exception:
+            st.info("Carregando mapa de dívidas...")
+    else:
+        st.info("Aguardando carregamento da aba Dívidas...")
 
-st.markdown("<div style='margin-bottom:20px;'></div>", unsafe_allow_html=True)
-
-# --- 5. GRÁFICO EM BARRA POR TIPO DE GASTO ---
+# --- 6. GRÁFICO EM BARRA POR TIPO DE GASTO (COM PORCENTAGEM FORA DA BARRA) ---
 with st.container(border=True):
-    st.markdown('<div class="card-header-navy">📊 DISTRIBUIÇÃO DE GASTOS POR TIPO DE SAÍDA (PIX E VR)</div>', unsafe_allow_html=True)
+    st.markdown('<div class="card-header-navy">📊 DISTRIBUIÇÃO DE GASTOS POR TIPO DE SAÍDA (PERCENTUAL)</div>', unsafe_allow_html=True)
 
-    if not df_saidas.empty:
+    if not df_saidas.empty and total_saidas_pix > 0:
         try:
             cols_tg = [c for c in df_saidas.columns if any(p in c.lower() for p in ['tipo de gasto', 'categoria'])]
             col_tg = cols_tg[0] if cols_tg else df_saidas.columns[1]
             
             df_bar = df_saidas.groupby(col_tg)['Valor_Clean'].sum().reset_index()
+            total_geral_saidas = df_bar['Valor_Clean'].sum()
+            
+            df_bar['Pct'] = (df_bar['Valor_Clean'] / total_geral_saidas) * 100
+            df_bar['Label_Text'] = df_bar.apply(lambda r: f"{r['Pct']:.1f}% ({fmt_brl(r['Valor_Clean'])})", axis=1)
             df_bar = df_bar.sort_values(by='Valor_Clean', ascending=True)
             
             fig_bar_tg = px.bar(
@@ -500,13 +539,14 @@ with st.container(border=True):
                 y=col_tg,
                 x='Valor_Clean',
                 orientation='h',
-                text_auto='.2s',
+                text='Label_Text',
                 color=col_tg,
                 color_discrete_sequence=['#FF5722', '#10B981', '#0284C7', '#0F172A', '#8B5CF6', '#F59E0B']
             )
+            fig_bar_tg.update_traces(textposition='outside')
             fig_bar_tg.update_layout(
                 height=300,
-                margin=dict(l=10, r=10, t=10, b=10),
+                margin=dict(l=10, r=80, t=10, b=10),
                 paper_bgcolor='rgba(0,0,0,0)',
                 plot_bgcolor='rgba(0,0,0,0)',
                 xaxis_title="Total Gasto (R$)",
