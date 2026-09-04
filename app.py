@@ -4,6 +4,7 @@ import numpy as np
 import plotly.express as px
 import urllib.parse
 import re
+import base64
 from datetime import datetime
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
@@ -13,6 +14,18 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed"
 )
+
+# --- FUNÇÃO PARA CARREGAR IMAGEM LOCAL ---
+def get_image_base64(path):
+    try:
+        with open(path, "rb") as img_file:
+            return base64.b64encode(img_file.read()).decode('utf-8')
+    except Exception:
+        return ""
+
+# Tenta carregar a imagem do avatar fornecida com o novo nome
+img_base64 = get_image_base64("assistente.png")
+avatar_src = f"data:image/png;base64,{img_base64}" if img_base64 else "https://cdn-icons-png.flaticon.com/512/4140/4140048.png"
 
 # --- ESTILIZAÇÃO CSS EXECUTIVA COM ESPAÇAMENTOS FIXOS ---
 st.markdown("""
@@ -26,6 +39,10 @@ st.markdown("""
     .stApp {
         background-color: #EAEFF5 !important;
         font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    }
+    
+    html {
+        scroll-behavior: smooth;
     }
     
     #MainMenu, footer, header {visibility: hidden;}
@@ -82,31 +99,28 @@ st.markdown("""
     .kpi-value-main { font-size: 1.8rem; font-weight: 800; color: #0F172A; }
     .kpi-subtext { font-size: 0.85rem; font-weight: 600; color: #64748B; margin-top: 4px; }
     
-    /* Balão de fala do Avatar */
+    /* Balão de fala e Avatar */
     .speech-bubble {
         position: relative;
         background: #F8FAFC;
         border-radius: 10px;
-        padding: 10px 14px;
+        padding: 12px 16px;
         border: 1px solid #CBD5E1;
-        font-size: 0.88rem;
+        font-size: 0.9rem;
         color: #1E293B;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.03);
     }
     
-    /* Avatar circular estilizado */
     .avatar-frame {
-        width: 75px;
-        height: 75px;
+        width: 90px;
+        height: 90px;
         border-radius: 50%;
         object-fit: cover;
-        box-shadow: 0 3px 8px rgba(0,0,0,0.15);
+        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        margin-top: 5px;
     }
     
-    html {
-        scroll-behavior: smooth;
-    }
-
-    div[data-testid="stRadio"] > div { flex-direction: row; flex-wrap: wrap; gap: 8px; }
+    div[data-testid="stRadio"] > div { flex-direction: row; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
     div[data-testid="stRadio"] div[role="radiogroup"] > label { 
         background-color: #F8FAFC; border: 1px solid #CBD5E1; padding: 6px 14px; border-radius: 6px; 
         cursor: pointer; font-weight: 700; font-size: 0.85rem; color: #334155;
@@ -171,7 +185,7 @@ df_dividas_fixas = carregar_aba(["Custos/parcelamentos ativos", "Custos e parcel
 df_entradas = carregar_aba(["Entradas", "Entradas Agosto"])
 df_saidas = carregar_aba(["Saídas", "Saidas"])
 
-# --- PROCESSAMENTO PRÉVIO DE ENTRADAS E SAÍDAS PARA O DIAGNÓSTICO DO TOPO ---
+# --- PROCESSAMENTO PRÉVIO PARA O SEMÁFORO DO TOPO ---
 col_desc_sai = obter_coluna_por_termo(df_saidas, ['descrição do gasto', 'descrição', 'descricao'])
 col_parc_sai = obter_coluna_por_termo(df_saidas, ['parcelamento', 'parcela'])
 col_tipo_gasto_sai = obter_coluna_por_termo(df_saidas, ['tipo de gasto', 'categoria'])
@@ -249,58 +263,55 @@ sobra_liquida = total_entradas_pix - total_saidas_pix
 sobra_salario = entradas_salario_pix - saidas_salario_pix
 sobra_adiantamento = entradas_adiantamento_pix - saidas_adiantamento_pix
 
-# CALCULO DO DIAGNÓSTICO DO SEMÁFORO DA ASSISTENTE
+# --- CALCULO DO DIAGNÓSTICO DO SEMÁFORO DA ASSISTENTE ---
 pct_gasto_total = (total_saidas_pix / total_entradas_pix) * 100 if total_entradas_pix > 0 else 100
 dia_atual = datetime.now().day
 
 if pct_gasto_total <= 60 and dia_atual <= 15:
-    cor_semaforo = "#10B981"
+    cor_semaforo = "#10B981"  # Verde
     border_semaforo = "#10B981"
     status_texto = "🟢 Mês sob controle!"
-    assistente_expressao = "👍 (Assistente Feliz)"
+    assistente_expressao = "Tudo dentro do planejado! 😊"
 elif pct_gasto_total > 75 or (pct_gasto_total > 50 and dia_atual <= 10):
-    cor_semaforo = "#FF5722"
+    cor_semaforo = "#FF5722"  # Vermelho
     border_semaforo = "#FF5722"
     status_texto = "🔴 Alerta de Gastos!"
-    assistente_expressao = "😟 (Assistente Preocupada)"
+    assistente_expressao = "Hora de pisar no freio! 😟"
 else:
-    cor_semaforo = "#F59E0B"
+    cor_semaforo = "#F59E0B"  # Amarelo
     border_semaforo = "#F59E0B"
     status_texto = "🟡 Atenção ao orçamento!"
-    assistente_expressao = "😐 (Assistente Atenta)"
+    assistente_expressao = "Vamos monitorar com cuidado. 😐"
 
-# URL da Imagem do Avatar
-URL_AVATAR = "https://raw.githubusercontent.com/pamellacastro/central-financeira/main/avatar.png"
-
-# --- HEADER COM AVATAR, BALÃO DE FALA E FILTROS ---
+# --- HEADER COM AVATAR, BALÃO E FILTROS ---
 with st.container(border=True):
-    col_av, col_tit, col_filtros = st.columns([0.8, 2.2, 2.2])
+    col_av, col_tit, col_filtros = st.columns([1, 4, 3])
     
     with col_av:
         st.markdown(f"""
         <div style="text-align:center;">
-            <img src="https://i.ibb.co/3ykGkPn/avatar-pamella.png" class="avatar-frame" style="border: 4px solid {border_semaforo};" onError="this.onerror=null;this.src='https://cdn-icons-png.flaticon.com/512/4140/4140048.png';">
+            <img src="{avatar_src}" class="avatar-frame" style="border: 4px solid {border_semaforo};" alt="Avatar da Assistente">
         </div>
         """, unsafe_allow_html=True)
         
     with col_tit:
         st.markdown(f"""
-        <h2 style='margin:0; font-size:1.6rem; font-weight:800; color:#0F172A;'>CONTROLE FINANCEIRO<br><span style='color:#FF5722; font-size:1.2rem;'>PAMELLA</span></h2>
-        <div class="speech-bubble" style="border-left: 5px solid {cor_semaforo}; margin-top:8px;">
-            <b style="color:{cor_semaforo}; font-size:0.95rem;">{status_texto}</b> <span style="font-size:0.75rem; color:#64748B;">{assistente_expressao}</span><br>
-            <span style="font-size:0.82rem; color:#334155;">
-                Caso queira saber mais, acesse o painel <b>INSIGHTS DA SUA ASSISTENTE</b> <a href="#insights" style="color:#0284C7; font-weight:700; text-decoration:underline;">clicando aqui</a>.
+        <h2 style='margin:0; font-size:1.7rem; font-weight:800; color:#0F172A;'>CONTROLE FINANCEIRO <span style='color:#FF5722;'>PAMELLA</span></h2>
+        <div class="speech-bubble" style="border-left: 5px solid {cor_semaforo}; margin-top:5px; display: inline-block;">
+            <b style="color:{cor_semaforo}; font-size:0.95rem;">{status_texto}</b> <span style="font-size:0.85rem; color:#64748B;">{assistente_expressao}</span><br>
+            <span style="font-size:0.85rem; color:#334155;">
+                Caso queira saber mais, acesse o painel <a href="#insights" style="color:#0284C7; font-weight:700; text-decoration:none;">INSIGHTS DA ASSISTENTE clicando aqui</a>.
             </span>
         </div>
         """, unsafe_allow_html=True)
         
     with col_filtros:
-        c_ano, c_mes = st.columns([1, 4])
+        c_ano, c_mes = st.columns([1, 3])
         with c_ano:
-            ano_selecionado = st.selectbox("Ano", [2026, 2027], index=0)
+            ano_selecionado = st.selectbox("Ano", [2026, 2027], index=0, label_visibility="collapsed")
         with c_mes:
             meses_botoes = ["jan.", "fev.", "mar.", "abr.", "mai.", "jun.", "jul.", "ago.", "set.", "out.", "nov.", "dez."]
-            mes_selecionado = st.radio("Mês", meses_botoes, index=8, horizontal=True)
+            mes_selecionado = st.radio("Mês", meses_botoes, index=8, horizontal=True, label_visibility="collapsed")
 
 # --- 1. RESUMO EXECUTIVO GERAL ---
 with st.container(border=True):
@@ -410,7 +421,7 @@ with st.container(border=True):
         </div>
         """, unsafe_allow_html=True)
 
-# --- 5. MAPEAMENTO DE DÍVIDAS: ATRASADAS ---
+# --- 5. MAPEAMENTO DE DÍVIDAS: ATRASADAS (LÓGICA CONGELADA) ---
 with st.container(border=True):
     st.markdown('<div class="card-header-orange">⚠️ MAPEAMENTO DE DÍVIDAS: ATRASADAS</div>', unsafe_allow_html=True)
 
@@ -452,10 +463,6 @@ with st.container(border=True):
             total_pago = 0.0
             
             if is_acordado and not df_saidas.empty and col_desc_sai:
-                df_saidas_parc = df_saidas.copy()
-                if not mask_parcelamentos.empty and mask_parcelamentos.any():
-                    df_saidas_parc = df_saidas[mask_parcelamentos].copy()
-                
                 credor_alvo = credor_nome.strip().lower()
                 
                 def match_linha_saida(row_sai):
@@ -463,7 +470,8 @@ with st.container(border=True):
                     if not val_desc: return False
                     return (credor_alvo == val_desc) or (credor_alvo in val_desc) or (val_desc in credor_alvo)
                 
-                df_matches = df_saidas_parc[df_saidas_parc.apply(match_linha_saida, axis=1)]
+                mask_matches = df_saidas.apply(match_linha_saida, axis=1)
+                df_matches = df_saidas[mask_matches]
                 
                 if not df_matches.empty:
                     total_pago = df_matches['Valor_Clean'].sum()
@@ -471,6 +479,7 @@ with st.container(border=True):
                     
                     for _, r_match in df_matches.iterrows():
                         p_str = str(r_match[col_parc_sai]).strip() if col_parc_sai and pd.notna(r_match[col_parc_sai]) else ""
+                        
                         if '/' in p_str:
                             try:
                                 partes = p_str.split('/')
@@ -481,6 +490,7 @@ with st.container(border=True):
                                 if p_tot > 1:
                                     num_parc_total = p_tot
                             except: pass
+                    
                     if qtd_pagas == 0:
                         qtd_pagas = len(df_matches)
             
@@ -524,7 +534,8 @@ Aguardando acordo / negociação para este credor.
     else:
         st.info("Aba 'Dívidas atrasadas' não encontrada ou vazia.")
 
-# --- 6. CUSTOS E PARCELAMENTOS ATIVOS (SUBDIVISÃO VISUAL) ---
+
+# --- 6. CUSTOS E PARCELAMENTOS ATIVOS ---
 with st.container(border=True):
     st.markdown('<div class="card-header-navy">✅ CUSTOS / PARCELAMENTOS ATIVOS (POR JANELA)</div>', unsafe_allow_html=True)
 
@@ -646,7 +657,8 @@ with st.container(border=True):
     else:
         st.info("Aba 'Custos/parcelamentos ativos' não encontrada ou vazia.")
 
-# --- 7. INSIGHTS EXCLUSIVOS DA SUA ASSISTENTE (ÂNCORA #insights E SEM TREEMAP) ---
+
+# --- 7. INSIGHTS EXCLUSIVOS DA SUA ASSISTENTE (ÂNCORA #insights) ---
 st.markdown('<div id="insights"></div>', unsafe_allow_html=True)
 with st.container(border=True):
     st.markdown('<div class="card-header-navy">💡 INSIGHTS DA SUA ASSISTENTE PESSOAL</div>', unsafe_allow_html=True)
@@ -665,6 +677,7 @@ with st.container(border=True):
             maior_valor = maior_cat_row['Valor_Clean']
             pct_maior = maior_cat_row['Porcentagem']
 
+            # Usa as variáveis já calculadas lá no topo
             if pct_gasto_total <= 60 and dia_atual <= 15:
                 status_mes = "🟢 <b style='color:#10B981;'>Mês sob controle!</b> Estamos no início do mês e os gastos estão bem moderados. Excelente ritmo de economia!"
             elif pct_gasto_total > 75 or (pct_gasto_total > 50 and dia_atual <= 10):
@@ -678,7 +691,7 @@ with st.container(border=True):
 
             st.markdown(f"""
             <div style="background:#F8FAFC; padding:22px; border-radius:10px; border:1px solid #CBD5E1; border-left:6px solid #0F172A;">
-                <div style="font-size:1.15rem; font-weight:800; color:#0F172A; margin-bottom:10px;">Olá, Pamella! Aqui está sua análise financeira detalhada 🙋‍♀️</div>
+                <div style="font-size:1.15rem; font-weight:800; color:#0F172A; margin-bottom:10px;">Aqui está sua análise financeira detalhada 🙋‍♀️</div>
                 <div style="font-size:0.95rem; color:#334155; line-height:1.7;">
                     Analisando suas movimentações até hoje (dia {dia_atual}), identifiquei que o seu maior volume de despesas está concentrado na categoria <b>{maior_categoria}</b>, que consumiu <b>{pct_maior:.1f}%</b> dos seus gastos totais até aqui (<b>{fmt_brl(maior_valor)}</b>).<br><br>
                     <b>Diagnóstico do Período:</b> {status_mes}<br><br>
