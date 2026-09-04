@@ -23,10 +23,6 @@ def get_image_base64(path):
     except Exception:
         return ""
 
-# Tenta carregar a imagem do avatar fornecida
-img_base64 = get_image_base64("assistente.png")
-avatar_src = f"data:image/png;base64,{img_base64}" if img_base64 else "https://cdn-icons-png.flaticon.com/512/4140/4140048.png"
-
 # --- ESTILIZAÇÃO CSS EXECUTIVA ---
 st.markdown("""
 <style>
@@ -95,17 +91,13 @@ st.markdown("""
     .kpi-card-green { border-left-color: #10B981; }
     .kpi-card-blue { border-left-color: #0284C7; }
 
-    .kpi-title { font-size: 0.85rem; font-weight: 700; color: #64748B; text-transform: uppercase; margin-bottom: 6px; }
-    .kpi-value-main { font-size: 1.8rem; font-weight: 800; color: #0F172A; }
-    .kpi-subtext { font-size: 0.85rem; font-weight: 600; color: #64748B; margin-top: 4px; }
-    
     /* AVATAR EXPANDIDO E CENTRALIZADO */
     .avatar-frame {
-        width: 150px;
-        height: 150px;
+        width: 140px;
+        height: 140px;
         border-radius: 50%;
         object-fit: cover;
-        box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+        box-shadow: 0 4px 14px rgba(0,0,0,0.12);
         display: block;
         margin: 0 auto;
         transition: all 0.3s ease;
@@ -116,13 +108,14 @@ st.markdown("""
         position: relative;
         background: #FFFFFF;
         border-radius: 14px;
-        padding: 14px 20px;
+        padding: 12px 18px;
         border: 2px solid #CBD5E1;
-        font-size: 0.95rem;
+        font-size: 0.92rem;
         color: #1E293B;
         box-shadow: 0 4px 12px rgba(0,0,0,0.04);
-        margin-top: 10px;
+        margin-top: 6px;
         display: inline-block;
+        width: 100%;
     }
     
     /* Ponta do Balão direcionada à assistente */
@@ -130,7 +123,7 @@ st.markdown("""
         content: '';
         position: absolute;
         left: -10px;
-        top: 25px;
+        top: 22px;
         width: 0;
         height: 0;
         border-top: 8px solid transparent;
@@ -141,7 +134,7 @@ st.markdown("""
         content: '';
         position: absolute;
         left: -13px;
-        top: 24px;
+        top: 21px;
         width: 0;
         height: 0;
         border-top: 9px solid transparent;
@@ -149,10 +142,23 @@ st.markdown("""
         border-right: 11px solid #CBD5E1;
     }
     
-    div[data-testid="stRadio"] > div { flex-direction: row; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+    /* BOTÕES DE MÊS COMPACTOS E EM LINHA ÚNICA */
+    div[data-testid="stRadio"] > div { 
+        flex-direction: row; 
+        flex-wrap: nowrap; 
+        gap: 5px; 
+        justify-content: flex-start; 
+        overflow-x: auto;
+    }
     div[data-testid="stRadio"] div[role="radiogroup"] > label { 
-        background-color: #F8FAFC; border: 1px solid #CBD5E1; padding: 6px 14px; border-radius: 6px; 
-        cursor: pointer; font-weight: 700; font-size: 0.85rem; color: #334155;
+        background-color: #F8FAFC; 
+        border: 1px solid #CBD5E1; 
+        padding: 5px 10px; 
+        border-radius: 6px; 
+        cursor: pointer; 
+        font-weight: 700; 
+        font-size: 0.8rem; 
+        color: #334155;
     }
     div[data-testid="stRadio"] div[role="radiogroup"] > label > div:first-child { display: none !important; }
     div[data-testid="stRadio"] div[role="radiogroup"] > label[data-checked="true"] { 
@@ -319,32 +325,31 @@ else:
 img_base64 = get_image_base64(avatar_file)
 avatar_src = f"data:image/png;base64,{img_base64}" if img_base64 else "https://cdn-icons-png.flaticon.com/512/4140/4140048.png"
 
-# --- HEADER REORGANIZADO COM AVATAR MAIOR E BALÃO ALINHADO ---
+# --- HEADER REORGANIZADO COM FILTROS ENFILEIRADOS EMBAIXO DO BALÃO ---
 with st.container(border=True):
-    # Proporções ajustadas para acomodar perfeitamente o avatar maior e centralizar os textos
-    col_av, col_tit, col_filtros = st.columns([1.5, 4.5, 3.0]) 
+    col_av, col_content = st.columns([1.4, 7.6])
     
     with col_av:
         st.markdown(f"""
-        <div style="display: flex; justify-content: center; align-items: center; height: 100%; margin-top: 5px;">
+        <div style="display: flex; justify-content: center; align-items: center; height: 100%; padding-top: 5px;">
             <img src="{avatar_src}" class="avatar-frame" style="border: 5px solid {border_semaforo};" alt="Avatar da Assistente">
         </div>
         """, unsafe_allow_html=True)
         
-    with col_tit:
+    with col_content:
         st.markdown(f"""
-        <h2 style='margin:0; padding-top:5px; font-size:1.75rem; font-weight:800; color:#0F172A;'>CONTROLE FINANCEIRO <span style='color:#FF5722;'>PAMELLA</span></h2>
+        <h2 style='margin:0; padding-top:0px; font-size:1.65rem; font-weight:800; color:#0F172A;'>CONTROLE FINANCEIRO <span style='color:#FF5722;'>PAMELLA</span></h2>
         <div class="speech-bubble">
-            <b style="color:{cor_semaforo}; font-size:1.05rem;">{status_texto}</b> <span style="font-size:0.95rem; color:#64748B;">{assistente_expressao}</span><br>
-            <span style="font-size:0.9rem; color:#334155; display:inline-block; margin-top:4px;">
+            <b style="color:{cor_semaforo}; font-size:1.0rem;">{status_texto}</b> <span style="font-size:0.85rem; color:#64748B;">{assistente_expressao}</span><br>
+            <span style="font-size:0.85rem; color:#334155; display:inline-block; margin-top:2px;">
                 Caso queira saber mais, acesse o painel <a href="#insights" style="color:#0284C7; font-weight:700; text-decoration:none;">INSIGHTS DA ASSISTENTE clicando aqui</a>.
             </span>
         </div>
         """, unsafe_allow_html=True)
         
-    with col_filtros:
-        st.markdown("<div style='margin-top: 25px;'></div>", unsafe_allow_html=True) # Espaçamento invisível para descer os botões
-        c_ano, c_mes = st.columns([1, 3])
+        st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
+        
+        c_ano, c_mes = st.columns([1.2, 7.8])
         with c_ano:
             ano_selecionado = st.selectbox("Ano", [2026, 2027], index=0, label_visibility="collapsed")
         with c_mes:
@@ -475,10 +480,8 @@ with st.container(border=True):
             nome_divida = str(row[col_nome_div]).strip() if col_nome_div and pd.notna(row[col_nome_div]) else ""
             credor_nome = str(row[col_credor_div]).strip() if col_credor_div and pd.notna(row[col_credor_div]) else ""
             
-            if not nome_divida or nome_divida.lower() == 'nan':
-                nome_divida = credor_nome
-            if not credor_nome or credor_nome.lower() == 'nan':
-                credor_nome = nome_divida
+            if not nome_divida or nome_divida.lower() == 'nan': nome_divida = credor_nome
+            if not credor_nome or credor_nome.lower() == 'nan': credor_nome = nome_divida
             if not nome_divida or nome_divida.lower() == 'nan': continue
             
             val_total = limpar_valor(row[col_val_total_div]) if col_val_total_div else 0.0
