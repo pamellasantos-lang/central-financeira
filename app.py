@@ -349,7 +349,7 @@ with st.container(border=True):
         </div>
         """, unsafe_allow_html=True)
 
-# --- 5. MAPEAMENTO DE DÍVIDAS: ATRASADAS (TRAVADO E BLINDADO) ---
+# --- 5. MAPEAMENTO DE DÍVIDAS: ATRASADAS (LÓGICA CONGELADA) ---
 with st.container(border=True):
     st.markdown('<div class="card-header-orange">⚠️ MAPEAMENTO DE DÍVIDAS: ATRASADAS</div>', unsafe_allow_html=True)
 
@@ -463,7 +463,7 @@ Aguardando acordo / negociação para este credor.
         st.info("Aba 'Dívidas atrasadas' não encontrada ou vazia.")
 
 
-# --- 6. CUSTOS E PARCELAMENTOS ATIVOS (AJUSTE EXCLUSIVO SOLICITADO) ---
+# --- 6. CUSTOS E PARCELAMENTOS ATIVOS (SUBDIVISÃO VISUAL + LINK COM SAÍDAS) ---
 with st.container(border=True):
     st.markdown('<div class="card-header-navy">✅ CUSTOS / PARCELAMENTOS ATIVOS (POR JANELA)</div>', unsafe_allow_html=True)
 
@@ -476,8 +476,10 @@ with st.container(border=True):
         col_fim_fixa = obter_coluna_por_termo(df_dividas_fixas, ['finaliza em', 'finaliza', 'fim', 'término', 'termino'])
         col_janela_fixa = obter_coluna_por_termo(df_dividas_fixas, ['janela'])
         
-        itens_salario = []
-        itens_adiantamento = []
+        salario_fixos = []
+        salario_parcelados = []
+        adiantamento_fixos = []
+        adiantamento_parcelados = []
         
         for idx, row in df_dividas_fixas.iterrows():
             nome_div = str(row[col_nome_fixa]).strip() if col_nome_fixa and pd.notna(row[col_nome_fixa]) else "Desconhecido"
@@ -490,40 +492,96 @@ with st.container(border=True):
             if col_parc_fixa and pd.notna(row[col_parc_fixa]):
                 is_parcelado = str(row[col_parc_fixa]).strip().lower() in ['sim', 's', 'true', '1']
             
+            num_parc_total = 1
             qtd_parc_str = str(row[col_num_parc_fixa]).strip() if col_num_parc_fixa and pd.notna(row[col_num_parc_fixa]) else "-"
+            match_p = re.search(r'(\d+)', qtd_parc_str)
+            if match_p:
+                num_parc_total = int(match_p.group(1))
+
             data_inicio = str(row[col_inicio_fixa]).strip() if col_inicio_fixa and pd.notna(row[col_inicio_fixa]) else "-"
             data_fim = str(row[col_fim_fixa]).strip() if col_fim_fixa and pd.notna(row[col_fim_fixa]) else "-"
+
+            # Cruzamento com Saídas para obter o progresso do parcelamento
+            qtd_pagas = 0
+            p_str_encontrada = ""
             
+            if is_parcelado and not df_saidas.empty and col_desc_sai:
+                nome_target = nome_div.strip().lower()
+                
+                def match_fixa_saida(row_s):
+                    d_s = str(row_s[col_desc_sai]).strip().lower() if col_desc_sai else ""
+                    if not d_s: return False
+                    return (nome_target in d_s) or (d_s in nome_target)
+                
+                df_m_fixa = df_saidas[df_saidas.apply(match_fixa_saida, axis=1)]
+                if not df_m_fixa.empty:
+                    for _, r_m in df_m_fixa.iterrows():
+                        p_val = str(r_m[col_parc_sai]).strip() if col_parc_sai and pd.notna(r_m[col_parc_sai]) else ""
+                        if '/' in p_val:
+                            try:
+                                pt = p_val.split('/')
+                                curr_p = int(pt[0].strip())
+                                tot_p = int(pt[1].strip())
+                                if curr_p > 0:
+                                    qtd_pagas = max(qtd_pagas, curr_p)
+                                if tot_p > 1:
+                                    num_parc_total = tot_p
+                                p_str_encontrada = p_val
+                            except: pass
+                    if qtd_pagas == 0:
+                        qtd_pagas = len(df_m_fixa)
+
             if is_parcelado:
-                info_parc_html = f"• <b>Quantidade de Parcelas:</b> {qtd_parc_str}<br>• <b>Início do Pagamento:</b> {data_inicio}<br>• <b>Finaliza em:</b> {data_fim}"
+                if qtd_pagas > 0:
+                    badge_status = f"<span style='color:#10B981; font-weight:700;'>{qtd_pagas} de {num_parc_total} pagas ({p_str_encontrada if p_str_encontrada else f'{qtd_pagas}/{num_parc_total}'})</span>"
+                else:
+                    badge_status = f"<span style='color:#64748B; font-weight:600;'>0 de {num_parc_total} pagas este mês</span>"
+
+                info_parc_html = f"• <b>Quantidade de Parcelas:</b> {qtd_parc_str}<br>• <b>Início do Pagamento:</b> {data_inicio}<br>• <b>Finaliza em:</b> {data_fim}<br>• <b>Status no Mês:</b> {badge_status}"
             else:
                 info_parc_html = "• <b>Custo Fixo Contínuo</b> (Sem data final)"
                 
-            html_item = f"""<div style="background:#F8FAFC; padding:16px; border-radius:8px; border:1px solid #CBD5E1; margin-bottom:10px;">
-<div style="font-weight:800; font-size:1.1rem; color:#0F172A; margin-bottom:4px;">{nome_div}</div>
-<div style="font-size:0.95rem; color:#334155;">
+            html_item = f"""<div style="background:#F8FAFC; padding:14px; border-radius:8px; border:1px solid #CBD5E1; margin-bottom:10px;">
+<div style="font-weight:800; font-size:1.05rem; color:#0F172A; margin-bottom:4px;">{nome_div}</div>
+<div style="font-size:0.9rem; color:#334155; line-height:1.5;">
 • <b>Valor (R$):</b> <span style="color:#0F172A; font-weight:700;">{fmt_brl(val_div)}</span><br>
 {info_parc_html}
 </div></div>"""
             
             if 'salário' in janela or 'salario' in janela or '05' in janela:
-                itens_salario.append(html_item)
+                if is_parcelado: salario_parcelados.append(html_item)
+                else: salario_fixos.append(html_item)
             else:
-                itens_adiantamento.append(html_item)
+                if is_parcelado: adiantamento_parcelados.append(html_item)
+                else: adiantamento_fixos.append(html_item)
                 
         c_fix1, c_fix2 = st.columns(2)
         with c_fix1:
             st.markdown("<div style='font-size:1.1rem; font-weight:800; color:#0F172A; margin-bottom:12px; border-bottom:2px solid #10B981; padding-bottom:6px;'>💳 Pagamentos Janela Salário (Dia 05)</div>", unsafe_allow_html=True)
-            if itens_salario:
-                for it in itens_salario: st.markdown(it, unsafe_allow_html=True)
-            else:
+            
+            if salario_fixos:
+                st.markdown("<div style='font-size:0.95rem; font-weight:700; color:#334155; margin-bottom:8px; margin-top:10px; border-bottom:1px dashed #CBD5E1; padding-bottom:4px;'>🔄 Custos Fixos Contínuos</div>", unsafe_allow_html=True)
+                for it in salario_fixos: st.markdown(it, unsafe_allow_html=True)
+            
+            if salario_parcelados:
+                st.markdown("<div style='font-size:0.95rem; font-weight:700; color:#334155; margin-bottom:8px; margin-top:15px; border-bottom:1px dashed #CBD5E1; padding-bottom:4px;'>🔢 Parcelamentos Ativos</div>", unsafe_allow_html=True)
+                for it in salario_parcelados: st.markdown(it, unsafe_allow_html=True)
+
+            if not salario_fixos and not salario_parcelados:
                 st.write("Sem registros para esta janela.")
                 
         with c_fix2:
             st.markdown("<div style='font-size:1.1rem; font-weight:800; color:#0F172A; margin-bottom:12px; border-bottom:2px solid #0284C7; padding-bottom:6px;'>💳 Pagamentos Janela Adiantamento (Dia 15)</div>", unsafe_allow_html=True)
-            if itens_adiantamento:
-                for it in itens_adiantamento: st.markdown(it, unsafe_allow_html=True)
-            else:
+            
+            if adiantamento_fixos:
+                st.markdown("<div style='font-size:0.95rem; font-weight:700; color:#334155; margin-bottom:8px; margin-top:10px; border-bottom:1px dashed #CBD5E1; padding-bottom:4px;'>🔄 Custos Fixos Contínuos</div>", unsafe_allow_html=True)
+                for it in adiantamento_fixos: st.markdown(it, unsafe_allow_html=True)
+            
+            if adiantamento_parcelados:
+                st.markdown("<div style='font-size:0.95rem; font-weight:700; color:#334155; margin-bottom:8px; margin-top:15px; border-bottom:1px dashed #CBD5E1; padding-bottom:4px;'>🔢 Parcelamentos Ativos</div>", unsafe_allow_html=True)
+                for it in adiantamento_parcelados: st.markdown(it, unsafe_allow_html=True)
+
+            if not adiantamento_fixos and not adiantamento_parcelados:
                 st.write("Sem registros para esta janela.")
     else:
         st.info("Aba 'Custos/parcelamentos ativos' não encontrada ou vazia.")
