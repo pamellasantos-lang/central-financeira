@@ -13,7 +13,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- ESTILIZAÇÃO CSS EXECUTIVA ---
+# --- ESTILIZAÇÃO CSS EXECUTIVA COM ESPAÇAMENTOS FIXOS ---
 st.markdown("""
 <style>
     .block-container {
@@ -122,7 +122,7 @@ def obter_coluna_por_termo(df, termos):
 
 def obter_coluna_data_fim(df):
     if df.empty: return None
-    cols = [c for c in df.columns if any(p in c.lower() for p in ['fim', 'final', 'término', 'termino', 'última', 'ultima', 'quitação'])]
+    cols = [c for c in df.columns if any(p in c.lower() for p in ['fim', 'final', 'término', 'termino', 'última', 'ultima', 'quitação', 'finalização'])]
     if cols: return cols[-1]
     return None
 
@@ -144,7 +144,7 @@ df_dividas_fixas = carregar_aba(["Dividas Fixas", "Dívidas Fixas", "Parcelament
 df_entradas = carregar_aba(["Entradas", "Entradas Agosto"])
 df_saidas = carregar_aba(["Saídas", "Saidas"])
 
-# --- HEADER: ALINHADO À ESQUERDA ---
+# --- HEADER ALINHADO À ESQUERDA ---
 with st.container(border=True):
     col_titulo, col_filtros = st.columns([1.2, 2])
     with col_titulo:
@@ -158,7 +158,6 @@ with st.container(border=True):
             mes_selecionado = st.radio("Mês", meses_botoes, index=8, horizontal=True)
 
 # --- PROCESSAMENTO AUTOMÁTICO DE DADOS ---
-
 # 1. ENTRADAS
 total_entradas_pix, total_entradas_vr = 0.0, 0.0
 entradas_salario_pix, entradas_adiantamento_pix = 0.0, 0.0
@@ -205,7 +204,7 @@ if not df_saidas.empty:
         cols_tipo_gasto = [c for c in df_saidas.columns if any(p in c.lower() for p in ['tipo de gasto', 'categoria'])]
         col_tipo_gasto_sai = cols_tipo_gasto[0] if cols_tipo_gasto else df_saidas.columns[1]
         
-        col_desc_sai = obter_coluna_por_termo(df_saidas, ['descrição', 'descricao', 'gasto', 'detalhe'])
+        col_desc_sai = obter_coluna_por_termo(df_saidas, ['descrição do gasto', 'descrição', 'descricao', 'gasto', 'detalhe'])
         col_parc_sai = obter_coluna_por_termo(df_saidas, ['parcelamento', 'parcela'])
         
         col_data = [c for c in df_saidas.columns if 'data' in c.lower()][0]
@@ -241,6 +240,10 @@ if df_saidas.empty or total_saidas_pix == 0:
 sobra_liquida = total_entradas_pix - total_saidas_pix
 sobra_salario = entradas_salario_pix - saidas_salario_pix
 sobra_adiantamento = entradas_adiantamento_pix - saidas_adiantamento_pix
+
+# ====================================================================
+# ORDEM DOS QUADROS SOLICITADA
+# ====================================================================
 
 # --- 1. RESUMO EXECUTIVO GERAL ---
 with st.container(border=True):
@@ -355,49 +358,40 @@ with st.container(border=True):
     st.markdown('<div class="card-header-orange">⚠️ MAPEAMENTO DE DÍVIDAS: ATRASADAS</div>', unsafe_allow_html=True)
 
     if not df_dividas_atrasadas.empty:
-        col_nome = obter_coluna_por_termo(df_dividas_atrasadas, ['credor', 'nome', 'dívida', 'divida', 'descrição'])
-        col_val = obter_coluna_valor_principal(df_dividas_atrasadas)
-        col_acordo = obter_coluna_por_termo(df_dividas_atrasadas, ['acordo', 'entrou'])
-        col_num_parc = obter_coluna_por_termo(df_dividas_atrasadas, ['quantidade', 'parcelas', 'num', 'nº'])
-        
-        termos_ignorar = ['empréstimo', 'emprestimo', 'cartão', 'cartao', 'fatura', 'banco', 'de', 'da', 'do', 'dívida', 'divida', 'acordo']
+        col_nome_div = obter_coluna_por_termo(df_dividas_atrasadas, ['nome da dívida', 'nome da divida', 'nome'])
+        col_credor_div = obter_coluna_por_termo(df_dividas_atrasadas, ['credor'])
+        col_val_total_div = obter_coluna_valor_principal(df_dividas_atrasadas)
+        col_acordo = obter_coluna_por_termo(df_dividas_atrasadas, ['entrou em acordo', 'acordo'])
+        col_parc_feito = obter_coluna_por_termo(df_dividas_atrasadas, ['parcelamento feito', 'parcelamento'])
+        col_inicio_div = obter_coluna_por_termo(df_dividas_atrasadas, ['inicio', 'início'])
+        col_fim_div = obter_coluna_data_fim(df_dividas_atrasadas)
         
         for idx, row in df_dividas_atrasadas.iterrows():
-            credor = str(row[col_nome]).strip() if col_nome else "Desconhecido"
-            if not credor or credor == 'nan': continue
+            nome_divida = str(row[col_nome_div]).strip() if col_nome_div and pd.notna(row[col_nome_div]) else "Dívida"
+            credor_nome = str(row[col_credor_div]).strip() if col_credor_div and pd.notna(row[col_credor_div]) else nome_divida
             
-            val_total = limpar_valor(row[col_val])
+            if not credor_nome or credor_nome == 'nan': continue
+            
+            val_total = limpar_valor(row[col_val_total_div]) if col_val_total_div else 0.0
             if val_total <= 0: continue
             
             is_acordado = False
-            if col_acordo:
+            if col_acordo and pd.notna(row[col_acordo]):
                 is_acordado = str(row[col_acordo]).strip().lower() == 'sim'
             
             qtd_pagas, total_pago = 0, 0.0
-            num_parc_total = 1
-            if col_num_parc and pd.notna(row[col_num_parc]):
-                v = limpar_valor(row[col_num_parc])
-                if v > 0: num_parc_total = int(v)
+            tot_parc = 1
             
-            # Algoritmo de cruzamento flexível para capturar a parcela paga
+            # Cruzamento direto: Credor das dívidas == Descrição do Gasto das Saídas
             if is_acordado and not df_saidas.empty and col_desc_sai:
-                df_busca_saidas = df_saidas[mask_parcelamentos] if (not mask_parcelamentos.empty and mask_parcelamentos.any()) else df_saidas
-                
-                palavras_credor = [w for w in credor.lower().split() if w not in termos_ignorar]
-                
-                def bate_credor(desc):
-                    d_str = str(desc).lower()
-                    if not palavras_credor:
-                        return credor.lower() in d_str
-                    return any(p in d_str for p in palavras_credor)
-                
-                mask_match = df_busca_saidas[col_desc_sai].apply(bate_credor)
-                df_matches = df_busca_saidas[mask_match]
+                mask_match = df_saidas[col_desc_sai].astype(str).str.contains(credor_nome, case=False, na=False)
+                df_matches = df_saidas[mask_match]
                 
                 if not df_matches.empty:
                     total_pago = df_matches['Valor_Clean'].sum()
                     qtd_pagas = len(df_matches)
                     
+                    # Leitura da coluna Parcelamento nas Saídas (ex: "1/36")
                     if col_parc_sai and col_parc_sai in df_matches.columns:
                         for p_str in df_matches[col_parc_sai].dropna().astype(str):
                             if '/' in p_str:
@@ -408,18 +402,19 @@ with st.container(border=True):
                                     if curr_p > 0:
                                         qtd_pagas = max(qtd_pagas, curr_p)
                                     if tot_p > 1:
-                                        num_parc_total = tot_p
+                                        tot_parc = tot_p
                                 except: pass
             
-            if is_acordado and num_parc_total <= 1:
-                num_parc_total = 36 # Default
-            
             saldo_restante = max(0.0, val_total - total_pago)
-            faltam_pagar = max(0, num_parc_total - qtd_pagas)
+            faltam_pagar = max(0, tot_parc - qtd_pagas)
+            
+            parc_feito_txt = str(row[col_parc_feito]) if col_parc_feito and pd.notna(row[col_parc_feito]) else "-"
+            inicio_txt = str(row[col_inicio_div]) if col_inicio_div and pd.notna(row[col_inicio_div]) else "-"
+            fim_txt = str(row[col_fim_div]) if col_fim_div and pd.notna(row[col_fim_div]) else "-"
             
             cor = "#0284C7" if is_acordado else "#FF5722"
             bg = "#E0F2FE" if is_acordado else "#FEE2E2"
-            status = "Acordado / Parcelado" if is_acordado else "Pendente"
+            status = "Acordo Ativo" if is_acordado else "Pendente"
             
             if is_acordado:
                 detalhes_blocos = f"""<div style="flex: 1; min-width: 150px; font-size:0.95rem; color:#334155;">
@@ -436,12 +431,14 @@ Aguardando acordo / negociação para este credor.
 </div>"""
             
             html_card_atr = f"""<div style="background:#F8FAFC; padding:18px; border-radius:8px; border:1px solid #CBD5E1; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
-<div style="flex: 1; min-width: 250px;">
-<span style="font-weight:800; font-size:1.1rem; color:#0F172A;">{credor}</span><br>
+<div style="flex: 1.2; min-width: 250px;">
+<span style="font-weight:800; font-size:1.1rem; color:#0F172A;">{nome_divida}</span><br>
+<span style="font-size:0.85rem; color:#64748B;">Credor: <b>{credor_nome}</b></span><br>
 <span style="background:{bg}; color:{cor}; border:1px solid {cor}; padding:2px 8px; border-radius:12px; font-weight:700; font-size:0.75rem;">{status}</span>
 </div>
 <div style="flex: 1; min-width: 150px; font-size:0.95rem; color:#334155;">
-<b>Valor Total:</b> <span style="color:#0F172A; font-weight:700;">{fmt_brl(val_total)}</span>
+<b>Valor Total:</b> <span style="color:#0F172A; font-weight:700;">{fmt_brl(val_total)}</span><br>
+<span style="font-size:0.85rem; color:#64748B;">Acordo: {parc_feito_txt}</span>
 </div>
 {detalhes_blocos}
 </div>"""
@@ -478,16 +475,15 @@ with st.container(border=True):
             
             qtd_pagas, total_pago = 0, 0.0
             if is_parcelado and not df_saidas.empty and col_desc_sai:
-                df_busca_fixas = df_saidas[mask_parcelamentos] if (not mask_parcelamentos.empty and mask_parcelamentos.any()) else df_saidas
-                mask_match = df_busca_fixas[col_desc_sai].astype(str).str.contains(desc.split()[0], case=False, na=False)
+                mask_match = df_saidas[col_desc_sai].astype(str).str.contains(desc, case=False, na=False)
                 qtd_pagas = mask_match.sum()
-                total_pago = df_busca_fixas[mask_match]['Valor_Clean'].sum()
+                total_pago = df_saidas[mask_match]['Valor_Clean'].sum()
             
             data_inicio = str(row[col_inicio_fixa]) if col_inicio_fixa and pd.notna(row[col_inicio_fixa]) else "-"
             data_fim = str(row[col_fim_fixa]) if col_fim_fixa and pd.notna(row[col_fim_fixa]) else "-"
             
             if is_parcelado:
-                info_parc_html = f"• <b>Início do Pagamento:</b> {data_inicio} (1ª parcela)<br>• <b>Finaliza em:</b> {data_fim}<br>• <b>Parcelas Confirmadas no Mês:</b> <span style='color:#10B981; font-weight:700;'>{qtd_pagas} paga(s)</span>"
+                info_parc_html = f"• <b>Início do Pagamento:</b> {data_inicio}<br>• <b>Finaliza em:</b> {data_fim}<br>• <b>Parcelas Confirmadas no Mês:</b> <span style='color:#10B981; font-weight:700;'>{qtd_pagas} paga(s)</span>"
             else:
                 info_parc_html = "• <b>Custo Fixo Contínuo</b> (Sem data final)"
                 
