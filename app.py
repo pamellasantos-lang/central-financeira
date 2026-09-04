@@ -13,7 +13,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- ESTILIZAÇÃO CSS EXECUTIVA COM ESPAÇAMENTOS FIXOS ---
+# --- ESTILIZAÇÃO CSS EXECUTIVA ---
 st.markdown("""
 <style>
     .block-container {
@@ -229,7 +229,7 @@ if not df_saidas.empty:
         gasto_lucca_vr = df_saidas[mask_lucca & mask_sai_vr]['Valor_Clean'].sum()
         gasto_lucca_pix = df_saidas[mask_lucca & mask_sai_pix]['Valor_Clean'].sum()
         
-        mask_parcelamentos = df_saidas[col_tipo_gasto_sai].astype(str).str.contains('parcelamento', case=False, na=False)
+        mask_parcelamentos = df_saidas[col_tipo_gasto_sai].astype(str).str.contains('parcelamento|acordo|dívida|divida', case=False, na=False)
     except: pass
 
 if df_saidas.empty or total_saidas_pix == 0:
@@ -360,6 +360,8 @@ with st.container(border=True):
         col_acordo = obter_coluna_por_termo(df_dividas_atrasadas, ['acordo', 'entrou'])
         col_num_parc = obter_coluna_por_termo(df_dividas_atrasadas, ['quantidade', 'parcelas', 'num', 'nº'])
         
+        termos_ignorar = ['empréstimo', 'emprestimo', 'cartão', 'cartao', 'fatura', 'banco', 'de', 'da', 'do', 'dívida', 'divida', 'acordo']
+        
         for idx, row in df_dividas_atrasadas.iterrows():
             credor = str(row[col_nome]).strip() if col_nome else "Desconhecido"
             if not credor or credor == 'nan': continue
@@ -373,46 +375,41 @@ with st.container(border=True):
             
             qtd_pagas, total_pago = 0, 0.0
             num_parc_total = 1
-            
             if col_num_parc and pd.notna(row[col_num_parc]):
                 v = limpar_valor(row[col_num_parc])
                 if v > 0: num_parc_total = int(v)
             
-            # Busca avançada e inteligente no lançamento de saídas
-            if is_acordado and not df_saidas.empty and not mask_parcelamentos.empty and col_desc_sai:
-                df_saidas_parc = df_saidas[mask_parcelamentos].copy()
+            # Algoritmo de cruzamento flexível para capturar a parcela paga
+            if is_acordado and not df_saidas.empty and col_desc_sai:
+                df_busca_saidas = df_saidas[mask_parcelamentos] if (not mask_parcelamentos.empty and mask_parcelamentos.any()) else df_saidas
                 
-                # Desconsidera termos irrelevantes no nome da dívida para bater o nome certo (ex: "Empréstimo Mercado Livre" -> "Mercado Livre")
-                credor_limpo = credor.lower().replace('empréstimo', '').replace('emprestimo', '').replace('cartão', '').replace('cartao', '').strip()
-                palavras_chave = [w for w in credor_limpo.split() if len(w) >= 3]
+                palavras_credor = [w for w in credor.lower().split() if w not in termos_ignorar]
                 
-                def e_correspondente(desc):
-                    d = str(desc).lower()
-                    if credor_limpo in d or d in credor_limpo: return True
-                    if palavras_chave and any(w in d for w in palavras_chave): return True
-                    return False
+                def bate_credor(desc):
+                    d_str = str(desc).lower()
+                    if not palavras_credor:
+                        return credor.lower() in d_str
+                    return any(p in d_str for p in palavras_credor)
                 
-                mask_match = df_saidas_parc[col_desc_sai].apply(e_correspondente)
-                df_matches = df_saidas_parc[mask_match]
+                mask_match = df_busca_saidas[col_desc_sai].apply(bate_credor)
+                df_matches = df_busca_saidas[mask_match]
                 
                 if not df_matches.empty:
                     total_pago = df_matches['Valor_Clean'].sum()
+                    qtd_pagas = len(df_matches)
                     
-                    # Leitura direta da coluna "Parcelamento" (ex: "1/36")
                     if col_parc_sai and col_parc_sai in df_matches.columns:
-                        for p_str in df_matches[col_parc_sai].astype(str).str.strip():
+                        for p_str in df_matches[col_parc_sai].dropna().astype(str):
                             if '/' in p_str:
                                 try:
                                     partes = p_str.split('/')
                                     curr_p = int(partes[0].strip())
                                     tot_p = int(partes[1].strip())
-                                    if curr_p > qtd_pagas:
-                                        qtd_pagas = curr_p
+                                    if curr_p > 0:
+                                        qtd_pagas = max(qtd_pagas, curr_p)
                                     if tot_p > 1:
                                         num_parc_total = tot_p
                                 except: pass
-                    if qtd_pagas == 0:
-                        qtd_pagas = len(df_matches)
             
             if is_acordado and num_parc_total <= 1:
                 num_parc_total = 36 # Default
@@ -480,11 +477,11 @@ with st.container(border=True):
                 is_parcelado = str(row[col_parc_fixa]).strip().lower() == 'sim'
             
             qtd_pagas, total_pago = 0, 0.0
-            if is_parcelado and not df_saidas.empty and not mask_parcelamentos.empty and col_desc_sai:
-                df_saidas_parc = df_saidas[mask_parcelamentos]
-                mask_match = df_saidas_parc[col_desc_sai].astype(str).str.contains(desc.split()[0], case=False, na=False)
+            if is_parcelado and not df_saidas.empty and col_desc_sai:
+                df_busca_fixas = df_saidas[mask_parcelamentos] if (not mask_parcelamentos.empty and mask_parcelamentos.any()) else df_saidas
+                mask_match = df_busca_fixas[col_desc_sai].astype(str).str.contains(desc.split()[0], case=False, na=False)
                 qtd_pagas = mask_match.sum()
-                total_pago = df_saidas_parc[mask_match]['Valor_Clean'].sum()
+                total_pago = df_busca_fixas[mask_match]['Valor_Clean'].sum()
             
             data_inicio = str(row[col_inicio_fixa]) if col_inicio_fixa and pd.notna(row[col_inicio_fixa]) else "-"
             data_fim = str(row[col_fim_fixa]) if col_fim_fixa and pd.notna(row[col_fim_fixa]) else "-"
