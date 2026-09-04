@@ -241,6 +241,10 @@ sobra_liquida = total_entradas_pix - total_saidas_pix
 sobra_salario = entradas_salario_pix - saidas_salario_pix
 sobra_adiantamento = entradas_adiantamento_pix - saidas_adiantamento_pix
 
+# ====================================================================
+# ORDEM FIXADA DOS QUADROS (BLINDADA)
+# ====================================================================
+
 # --- 1. RESUMO EXECUTIVO GERAL ---
 with st.container(border=True):
     st.markdown('<div class="card-header-navy">📊 RESUMO EXECUTIVO GERAL</div>', unsafe_allow_html=True)
@@ -349,7 +353,7 @@ with st.container(border=True):
         </div>
         """, unsafe_allow_html=True)
 
-# --- 5. MAPEAMENTO DE DÍVIDAS: ATRASADAS (LÓGICA CONGELADA) ---
+# --- 5. MAPEAMENTO DE DÍVIDAS: ATRASADAS ---
 with st.container(border=True):
     st.markdown('<div class="card-header-orange">⚠️ MAPEAMENTO DE DÍVIDAS: ATRASADAS</div>', unsafe_allow_html=True)
 
@@ -391,15 +395,18 @@ with st.container(border=True):
             total_pago = 0.0
             
             if is_acordado and not df_saidas.empty and col_desc_sai:
+                df_saidas_parc = df_saidas.copy()
+                if not mask_parcelamentos.empty and mask_parcelamentos.any():
+                    df_saidas_parc = df_saidas[mask_parcelamentos].copy()
+                
                 credor_alvo = credor_nome.strip().lower()
                 
-                def match_linha_saida(row_sai):
-                    val_desc = str(row_sai[col_desc_sai]).strip().lower() if col_desc_sai else ""
-                    if not val_desc: return False
-                    return (credor_alvo == val_desc) or (credor_alvo in val_desc) or (val_desc in credor_alvo)
+                def bate_credor_estrito(r_sai):
+                    desc_s = str(r_sai[col_desc_sai]).strip().lower() if col_desc_sai else ""
+                    if not desc_s: return False
+                    return (credor_alvo == desc_s) or (credor_alvo in desc_s) or (desc_s in credor_alvo)
                 
-                mask_matches = df_saidas.apply(match_linha_saida, axis=1)
-                df_matches = df_saidas[mask_matches]
+                df_matches = df_saidas_parc[df_saidas_parc.apply(bate_credor_estrito, axis=1)]
                 
                 if not df_matches.empty:
                     total_pago = df_matches['Valor_Clean'].sum()
@@ -407,7 +414,6 @@ with st.container(border=True):
                     
                     for _, r_match in df_matches.iterrows():
                         p_str = str(r_match[col_parc_sai]).strip() if col_parc_sai and pd.notna(r_match[col_parc_sai]) else ""
-                        
                         if '/' in p_str:
                             try:
                                 partes = p_str.split('/')
@@ -418,7 +424,6 @@ with st.container(border=True):
                                 if p_tot > 1:
                                     num_parc_total = p_tot
                             except: pass
-                    
                     if qtd_pagas == 0:
                         qtd_pagas = len(df_matches)
             
@@ -463,7 +468,7 @@ Aguardando acordo / negociação para este credor.
         st.info("Aba 'Dívidas atrasadas' não encontrada ou vazia.")
 
 
-# --- 6. CUSTOS E PARCELAMENTOS ATIVOS (SUBDIVISÃO VISUAL + LINK COM SAÍDAS) ---
+# --- 6. CUSTOS E PARCELAMENTOS ATIVOS (POR JANELA) ---
 with st.container(border=True):
     st.markdown('<div class="card-header-navy">✅ CUSTOS / PARCELAMENTOS ATIVOS (POR JANELA)</div>', unsafe_allow_html=True)
 
@@ -501,7 +506,6 @@ with st.container(border=True):
             data_inicio = str(row[col_inicio_fixa]).strip() if col_inicio_fixa and pd.notna(row[col_inicio_fixa]) else "-"
             data_fim = str(row[col_fim_fixa]).strip() if col_fim_fixa and pd.notna(row[col_fim_fixa]) else "-"
 
-            # Cruzamento com Saídas para obter o progresso do parcelamento
             qtd_pagas = 0
             p_str_encontrada = ""
             
@@ -587,21 +591,55 @@ with st.container(border=True):
         st.info("Aba 'Custos/parcelamentos ativos' não encontrada ou vazia.")
 
 
-# --- 7. DISTRIBUIÇÃO VISUAL DE GASTOS POR TIPO DE SAÍDA (TREEMAP) ---
+# --- 7. INSIGHTS DO MÊS E DISTRIBUIÇÃO VISUAL ---
 with st.container(border=True):
-    st.markdown('<div class="card-header-navy">📊 DISTRIBUIÇÃO VISUAL DE GASTOS POR TIPO DE SAÍDA (TREEMAP)</div>', unsafe_allow_html=True)
+    st.markdown('<div class="card-header-navy">💡 INSIGHTS DA SUA ASSISTENTE & DISTRIBUIÇÃO DE GASTOS</div>', unsafe_allow_html=True)
 
     if not df_saidas.empty and total_saidas_pix > 0:
         try:
             cols_tg = [c for c in df_saidas.columns if any(p in c.lower() for p in ['tipo de gasto', 'categoria'])]
             col_tg = cols_tg[0] if cols_tg else df_saidas.columns[1]
-            
+
             df_tree = df_saidas.groupby(col_tg)['Valor_Clean'].sum().reset_index()
-            total_gasto = df_tree['Valor_Clean'].sum()
-            df_tree['Porcentagem'] = (df_tree['Valor_Clean'] / total_gasto) * 100
-            
+            total_gasto_geral = df_tree['Valor_Clean'].sum()
+            df_tree['Porcentagem'] = (df_tree['Valor_Clean'] / total_gasto_geral) * 100
+
+            # Lógica Inteligente de Insights
+            maior_cat_row = df_tree.loc[df_tree['Valor_Clean'].idxmax()]
+            maior_categoria = maior_cat_row[col_tg]
+            maior_valor = maior_cat_row['Valor_Clean']
+            pct_maior = maior_cat_row['Porcentagem']
+
+            # Verifica quão rápido estamos gastando o dinheiro no mês
+            pct_gasto_total = (total_saidas_pix / total_entradas_pix) * 100 if total_entradas_pix > 0 else 100
+            dia_atual = datetime.now().day
+
+            # Avaliação de "Saúde" do mês
+            if pct_gasto_total <= 50 and dia_atual <= 15:
+                status_mes = "🟢 <b style='color:#10B981;'>Mês sob controle!</b> Estamos no início do mês e os gastos estão bem moderados. Excelente ritmo."
+            elif pct_gasto_total > 70 and dia_atual <= 15:
+                status_mes = "🔴 <b style='color:#FF5722;'>Alerta Vermelho!</b> Estamos na primeira quinzena e uma grande parte da sua receita já foi comprometida. Sugiro pisar no freio!"
+            elif pct_gasto_total >= 90:
+                status_mes = "🔴 <b style='color:#FF5722;'>Orçamento no Limite!</b> Você está gastando quase tudo que entrou. Evite qualquer compra não essencial agora."
+            elif pct_gasto_total < 80 and dia_atual > 15:
+                status_mes = "🟢 <b style='color:#10B981;'>Bom progresso!</b> Passamos da metade do mês com uma boa margem de respiro financeiro na conta."
+            else:
+                status_mes = "🟡 <b style='color:#F59E0B;'>Atenção Moderada.</b> Os gastos estão acompanhando os dias do mês proporcionalmente. Fique de olho para garantirmos o fechamento no azul."
+
+            st.markdown(f"""
+            <div style="background:#F8FAFC; padding:20px; border-radius:10px; border:1px solid #CBD5E1; border-left:6px solid #8B5CF6; margin-bottom:20px;">
+                <div style="font-size:1.15rem; font-weight:800; color:#0F172A; margin-bottom:8px;">Olá, Pamella! Aqui é sua Assistente Pessoal 🙋‍♀️</div>
+                <div style="font-size:0.95rem; color:#334155; line-height:1.6;">
+                    Analisando suas movimentações até hoje (dia {dia_atual}), identifiquei que o seu maior volume de despesas está concentrado na categoria <b>{maior_categoria}</b>, que consumiu <b>{pct_maior:.1f}%</b> dos seus gastos totais até aqui (<b>{fmt_brl(maior_valor)}</b>).<br><br>
+                    <b>Diagnóstico da sua Carteira:</b> {status_mes}<br>
+                    <i style="color:#64748B; font-size:0.85rem;">Obs: Como o mês está em andamento, meu diagnóstico se ajustará automaticamente a cada novo lançamento que você realizar na planilha.</i>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            # --- Treemap Visual ---
             df_tree['Rotulo'] = df_tree.apply(lambda r: f"<b>{r[col_tg]}</b><br>{r['Porcentagem']:.1f}%<br>{fmt_brl(r['Valor_Clean'])}", axis=1)
-            
+
             fig_tree = px.treemap(
                 df_tree,
                 path=[px.Constant("Saídas do Mês"), 'Rotulo'],
@@ -617,7 +655,7 @@ with st.container(border=True):
                 coloraxis_showscale=False
             )
             st.plotly_chart(fig_tree, use_container_width=True, config={'displayModeBar': False})
-        except Exception:
-            st.write("Processando treemap de saídas...")
+        except Exception as e:
+            st.write("Processando insights de saídas...", e)
     else:
-        st.info("Aguardando lançamentos na aba Saídas para compilar o gráfico visual...")
+        st.info("Aguardando lançamentos na aba Saídas para compilar seus insights do mês...")
