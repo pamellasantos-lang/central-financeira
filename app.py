@@ -158,6 +158,7 @@ with st.container(border=True):
             mes_selecionado = st.radio("Mês", meses_botoes, index=8, horizontal=True)
 
 # --- PROCESSAMENTO AUTOMÁTICO DE DADOS ---
+
 # 1. ENTRADAS
 total_entradas_pix, total_entradas_vr = 0.0, 0.0
 entradas_salario_pix, entradas_adiantamento_pix = 0.0, 0.0
@@ -191,6 +192,7 @@ gasto_gasolina_vr, gasto_gasolina_pix = 0.0, 0.0
 gasto_lucca_vr, gasto_lucca_pix = 0.0, 0.0
 mask_parcelamentos = pd.Series(dtype=bool)
 col_desc_sai = None
+col_parc_sai = None
 
 if not df_saidas.empty:
     try:
@@ -204,6 +206,7 @@ if not df_saidas.empty:
         col_tipo_gasto_sai = cols_tipo_gasto[0] if cols_tipo_gasto else df_saidas.columns[1]
         
         col_desc_sai = obter_coluna_por_termo(df_saidas, ['descrição', 'descricao', 'gasto', 'detalhe'])
+        col_parc_sai = obter_coluna_por_termo(df_saidas, ['parcelamento', 'parcela'])
         
         col_data = [c for c in df_saidas.columns if 'data' in c.lower()][0]
         df_saidas['Dia'] = pd.to_datetime(df_saidas[col_data], format='%d/%m/%Y', errors='coerce').dt.day
@@ -369,18 +372,50 @@ with st.container(border=True):
                 is_acordado = str(row[col_acordo]).strip().lower() == 'sim'
             
             qtd_pagas, total_pago = 0, 0.0
-            if is_acordado and not df_saidas.empty and not mask_parcelamentos.empty and col_desc_sai:
-                df_saidas_parc = df_saidas[mask_parcelamentos]
-                mask_match = df_saidas_parc[col_desc_sai].astype(str).str.contains(credor.split()[0], case=False, na=False)
-                qtd_pagas = mask_match.sum()
-                total_pago = df_saidas_parc[mask_match]['Valor_Clean'].sum()
-            
             num_parc_total = 1
+            
             if col_num_parc and pd.notna(row[col_num_parc]):
                 v = limpar_valor(row[col_num_parc])
                 if v > 0: num_parc_total = int(v)
+            
+            # Busca avançada e inteligente no lançamento de saídas
+            if is_acordado and not df_saidas.empty and not mask_parcelamentos.empty and col_desc_sai:
+                df_saidas_parc = df_saidas[mask_parcelamentos].copy()
+                
+                # Desconsidera termos irrelevantes no nome da dívida para bater o nome certo (ex: "Empréstimo Mercado Livre" -> "Mercado Livre")
+                credor_limpo = credor.lower().replace('empréstimo', '').replace('emprestimo', '').replace('cartão', '').replace('cartao', '').strip()
+                palavras_chave = [w for w in credor_limpo.split() if len(w) >= 3]
+                
+                def e_correspondente(desc):
+                    d = str(desc).lower()
+                    if credor_limpo in d or d in credor_limpo: return True
+                    if palavras_chave and any(w in d for w in palavras_chave): return True
+                    return False
+                
+                mask_match = df_saidas_parc[col_desc_sai].apply(e_correspondente)
+                df_matches = df_saidas_parc[mask_match]
+                
+                if not df_matches.empty:
+                    total_pago = df_matches['Valor_Clean'].sum()
+                    
+                    # Leitura direta da coluna "Parcelamento" (ex: "1/36")
+                    if col_parc_sai and col_parc_sai in df_matches.columns:
+                        for p_str in df_matches[col_parc_sai].astype(str).str.strip():
+                            if '/' in p_str:
+                                try:
+                                    partes = p_str.split('/')
+                                    curr_p = int(partes[0].strip())
+                                    tot_p = int(partes[1].strip())
+                                    if curr_p > qtd_pagas:
+                                        qtd_pagas = curr_p
+                                    if tot_p > 1:
+                                        num_parc_total = tot_p
+                                except: pass
+                    if qtd_pagas == 0:
+                        qtd_pagas = len(df_matches)
+            
             if is_acordado and num_parc_total <= 1:
-                num_parc_total = 36
+                num_parc_total = 36 # Default
             
             saldo_restante = max(0.0, val_total - total_pago)
             faltam_pagar = max(0, num_parc_total - qtd_pagas)
