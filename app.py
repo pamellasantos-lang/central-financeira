@@ -23,10 +23,6 @@ def get_image_base64(path):
     except Exception:
         return ""
 
-# Tenta carregar a imagem do avatar fornecida com o novo nome
-img_base64 = get_image_base64("assistente.png")
-avatar_src = f"data:image/png;base64,{img_base64}" if img_base64 else "https://cdn-icons-png.flaticon.com/512/4140/4140048.png"
-
 # --- ESTILIZAÇÃO CSS EXECUTIVA COM ESPAÇAMENTOS FIXOS ---
 st.markdown("""
 <style>
@@ -118,6 +114,7 @@ st.markdown("""
         object-fit: cover;
         box-shadow: 0 4px 10px rgba(0,0,0,0.1);
         margin-top: 5px;
+        transition: all 0.3s ease;
     }
     
     div[data-testid="stRadio"] > div { flex-direction: row; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
@@ -272,16 +269,23 @@ if pct_gasto_total <= 60 and dia_atual <= 15:
     border_semaforo = "#10B981"
     status_texto = "🟢 Mês sob controle!"
     assistente_expressao = "Tudo dentro do planejado! 😊"
+    avatar_file = "assistente_feliz.png"
 elif pct_gasto_total > 75 or (pct_gasto_total > 50 and dia_atual <= 10):
     cor_semaforo = "#FF5722"  # Vermelho
     border_semaforo = "#FF5722"
     status_texto = "🔴 Alerta de Gastos!"
     assistente_expressao = "Hora de pisar no freio! 😟"
+    avatar_file = "assistente_triste.png"
 else:
     cor_semaforo = "#F59E0B"  # Amarelo
     border_semaforo = "#F59E0B"
     status_texto = "🟡 Atenção ao orçamento!"
     assistente_expressao = "Vamos monitorar com cuidado. 😐"
+    avatar_file = "assistente_atenta.png"
+
+# Carrega a imagem da Assistente Dinamicamente
+img_base64 = get_image_base64(avatar_file)
+avatar_src = f"data:image/png;base64,{img_base64}" if img_base64 else "https://cdn-icons-png.flaticon.com/512/4140/4140048.png"
 
 # --- HEADER COM AVATAR, BALÃO E FILTROS ---
 with st.container(border=True):
@@ -421,7 +425,7 @@ with st.container(border=True):
         </div>
         """, unsafe_allow_html=True)
 
-# --- 5. MAPEAMENTO DE DÍVIDAS: ATRASADAS (LÓGICA CONGELADA) ---
+# --- 5. MAPEAMENTO DE DÍVIDAS: ATRASADAS ---
 with st.container(border=True):
     st.markdown('<div class="card-header-orange">⚠️ MAPEAMENTO DE DÍVIDAS: ATRASADAS</div>', unsafe_allow_html=True)
 
@@ -679,22 +683,22 @@ with st.container(border=True):
 
             # Usa as variáveis já calculadas lá no topo
             if pct_gasto_total <= 60 and dia_atual <= 15:
-                status_mes = "🟢 <b style='color:#10B981;'>Mês sob controle!</b> Estamos no início do mês e os gastos estão bem moderados. Excelente ritmo de economia!"
+                status_mes_bottom = "🟢 <b style='color:#10B981;'>Mês sob controle!</b> Estamos no início do mês e os gastos estão bem moderados. Excelente ritmo de economia!"
             elif pct_gasto_total > 75 or (pct_gasto_total > 50 and dia_atual <= 10):
-                status_mes = "🔴 <b style='color:#FF5722;'>Alerta Vermelho!</b> Estamos na primeira quinzena e uma grande parte da sua receita já foi comprometida. Sugiro pisar no freio nas despesas variáveis."
+                status_mes_bottom = "🔴 <b style='color:#FF5722;'>Alerta Vermelho!</b> Estamos na primeira quinzena e uma grande parte da sua receita já foi comprometida. Sugiro pisar no freio nas despesas variáveis."
             elif pct_gasto_total >= 90:
-                status_mes = "🔴 <b style='color:#FF5722;'>Orçamento no Limite!</b> Você está gastando quase tudo que entrou. Evite qualquer compra não essencial agora."
+                status_mes_bottom = "🔴 <b style='color:#FF5722;'>Orçamento no Limite!</b> Você está gastando quase tudo que entrou. Evite qualquer compra não essencial agora."
             elif pct_gasto_total < 80 and dia_atual > 15:
-                status_mes = "🟢 <b style='color:#10B981;'>Bom progresso!</b> Passamos da metade do mês com uma boa margem de respiro financeiro na conta."
+                status_mes_bottom = "🟢 <b style='color:#10B981;'>Bom progresso!</b> Passamos da metade do mês com uma boa margem de respiro financeiro na conta."
             else:
-                status_mes = "🟡 <b style='color:#F59E0B;'>Atenção Moderada.</b> Os gastos estão acompanhando os dias do mês proporcionalmente. Fique de olho para garantirmos o fechamento no azul."
+                status_mes_bottom = "🟡 <b style='color:#F59E0B;'>Atenção Moderada.</b> Os gastos estão acompanhando os dias do mês proporcionalmente. Fique de olho para garantirmos o fechamento no azul."
 
             st.markdown(f"""
             <div style="background:#F8FAFC; padding:22px; border-radius:10px; border:1px solid #CBD5E1; border-left:6px solid #0F172A;">
                 <div style="font-size:1.15rem; font-weight:800; color:#0F172A; margin-bottom:10px;">Aqui está sua análise financeira detalhada 🙋‍♀️</div>
                 <div style="font-size:0.95rem; color:#334155; line-height:1.7;">
                     Analisando suas movimentações até hoje (dia {dia_atual}), identifiquei que o seu maior volume de despesas está concentrado na categoria <b>{maior_categoria}</b>, que consumiu <b>{pct_maior:.1f}%</b> dos seus gastos totais até aqui (<b>{fmt_brl(maior_valor)}</b>).<br><br>
-                    <b>Diagnóstico do Período:</b> {status_mes}<br><br>
+                    <b>Diagnóstico do Período:</b> {status_mes_bottom}<br><br>
                     <i style="color:#64748B; font-size:0.85rem;">Obs: Como o mês está em andamento, esta análise se atualiza automaticamente conforme você insere novos pagamentos na planilha.</i>
                 </div>
             </div>
