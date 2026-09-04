@@ -13,10 +13,9 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- ESTILIZAÇÃO CSS EXECUTIVA COM ESPAÇAMENTOS RIGOROSOS ---
+# --- ESTILIZAÇÃO CSS EXECUTIVA COM ESPAÇAMENTOS FIXOS ---
 st.markdown("""
 <style>
-    /* Margens globais com espaço no topo */
     .block-container {
         padding-top: 1.5rem !important;
         padding-bottom: 3rem !important;
@@ -32,7 +31,6 @@ st.markdown("""
     [data-testid="collapsedControl"] {display: none;}
     section[data-testid="stSidebar"] {display: none;}
     
-    /* Espaçamento Rígido e Fixo Entre Quadros (Containers) */
     [data-testid="stVerticalBlockBorderWrapper"] {
         background-color: #FFFFFF !important;
         border-radius: 12px !important;
@@ -40,14 +38,13 @@ st.markdown("""
         box-shadow: 0 4px 12px rgba(0,0,0,0.05) !important;
         padding: 0px !important;
         overflow: hidden !important;
-        margin-bottom: 35px !important; /* Espaçamento grande garantido */
+        margin-bottom: 35px !important; 
     }
     
     [data-testid="stVerticalBlockBorderWrapper"] > div {
-        padding: 24px 28px !important;
+        padding: 24px 28px !important; 
     }
 
-    /* Cabeçalhos dos Cards */
     .card-header-navy {
         background: linear-gradient(90deg, #0F172A 0%, #1E293B 100%);
         color: #FFFFFF;
@@ -68,7 +65,6 @@ st.markdown("""
         margin: -24px -28px 24px -28px;
     }
 
-    /* KPI Cards Box (Resumo Executivo) */
     .kpi-card-box {
         background: #F8FAFC;
         padding: 20px;
@@ -85,7 +81,6 @@ st.markdown("""
     .kpi-value-main { font-size: 1.8rem; font-weight: 800; color: #0F172A; }
     .kpi-subtext { font-size: 0.85rem; font-weight: 600; color: #64748B; margin-top: 4px; }
     
-    /* Quadradinhos para Seleção do Mês */
     div[data-testid="stRadio"] > div { flex-direction: row; flex-wrap: wrap; gap: 8px; }
     div[data-testid="stRadio"] div[role="radiogroup"] > label { 
         background-color: #F8FAFC; border: 1px solid #CBD5E1; padding: 6px 14px; border-radius: 6px; 
@@ -99,7 +94,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- FUNÇÕES AUXILIARES TOTAIS (DECLARADAS NO ESCOPO GLOBAL SUPREMO) ---
+# --- FUNÇÕES DE LIMPEZA E FORMATAÇÃO ---
 def limpar_valor(val):
     if pd.isna(val): return 0.0
     if isinstance(val, (int, float)): return float(val)
@@ -127,7 +122,7 @@ def obter_coluna_por_termo(df, termos):
 
 def obter_coluna_data_fim(df):
     if df.empty: return None
-    cols = [c for c in df.columns if any(p in c.lower() for p in ['fim', 'final', 'término', 'termino', 'última', 'ultima', 'quitação', 'finaliza'])]
+    cols = [c for c in df.columns if any(p in c.lower() for p in ['fim', 'final', 'término', 'termino', 'última', 'ultima', 'quitação'])]
     if cols: return cols[-1]
     return None
 
@@ -145,11 +140,11 @@ def carregar_aba(nomes_possiveis):
     return pd.DataFrame()
 
 df_dividas_atrasadas = carregar_aba(["Dividas atrasadas", "Dívidas Atrasadas", "Dividas"])
-df_dividas_fixas = carregar_aba(["Dividas Fixas", "Dívidas Fixas", "Parcelamentos Fixos"])
+df_dividas_fixas = carregar_aba(["Dividas Fixas", "Dívidas Fixas", "Parcelamentos Fixos", "Custos Ativos"])
 df_entradas = carregar_aba(["Entradas", "Entradas Agosto"])
 df_saidas = carregar_aba(["Saídas", "Saidas"])
 
-# --- HEADER: MODELO ORIGINAL ALINHADO À ESQUERDA ---
+# --- HEADER: ALINHADO À ESQUERDA ---
 with st.container(border=True):
     col_titulo, col_filtros = st.columns([1.2, 2])
     with col_titulo:
@@ -163,7 +158,6 @@ with st.container(border=True):
             mes_selecionado = st.radio("Mês", meses_botoes, index=8, horizontal=True)
 
 # --- PROCESSAMENTO AUTOMÁTICO DE DADOS ---
-
 # 1. ENTRADAS
 total_entradas_pix, total_entradas_vr = 0.0, 0.0
 entradas_salario_pix, entradas_adiantamento_pix = 0.0, 0.0
@@ -218,6 +212,7 @@ if not df_saidas.empty:
         
         mask_sai_pix = df_saidas[col_tipo_pag].astype(str).str.contains('PIX|Dinheiro|Conta|Débito', case=False, na=False) | txt_sai.str.contains('PIX', case=False, na=False)
         mask_sai_vr = df_saidas[col_tipo_pag].astype(str).str.contains('VR|Flash|Crédito', case=False, na=False)
+        
         total_saidas_pix = df_saidas[mask_sai_pix]['Valor_Clean'].sum()
         
         df_saidas['Dia'] = df_saidas['Dia'].fillna(1)
@@ -231,6 +226,7 @@ if not df_saidas.empty:
         gasto_lucca_vr = df_saidas[mask_lucca & mask_sai_vr]['Valor_Clean'].sum()
         gasto_lucca_pix = df_saidas[mask_lucca & mask_sai_pix]['Valor_Clean'].sum()
         
+        # Filtro EXATO para identificação de parcelamentos na lógica das dívidas
         mask_parcelamentos = df_saidas[col_tipo_gasto_sai].astype(str).str.contains('parcelamento', case=False, na=False)
     except: pass
 
@@ -244,8 +240,9 @@ sobra_liquida = total_entradas_pix - total_saidas_pix
 sobra_salario = entradas_salario_pix - saidas_salario_pix
 sobra_adiantamento = entradas_adiantamento_pix - saidas_adiantamento_pix
 
+
 # ====================================================================
-# ORDEM ESTRITA DOS QUADROS SOLICITADA
+# ORDEM DOS QUADROS ESTRITAMENTE FIXADA E SEPARADA
 # ====================================================================
 
 # --- 1. RESUMO EXECUTIVO GERAL ---
@@ -302,7 +299,7 @@ with st.container(border=True):
                 <span style="background:#FF5722; color:white; padding:4px 12px; border-radius:12px; font-weight:700; font-size:0.85rem;">{pct_gas:.1f}% Usado</span>
             </div>
             <div style="background-color:#E2E8F0; border-radius:8px; height:10px; width:100%; overflow:hidden; margin-bottom:12px;">
-                <div style="background-color:#FF5722; width:{pct_gas:.1f}%; height:100%;"></div>
+                <div style="background-color:#FF5722; width:{pct_gas:.1f}%; height:100%; border-radius:8px;"></div>
             </div>
             <div style="font-size:0.95rem; color:#334155; line-height:1.6;">
                 • <b>Saiu do VR (Flash):</b> <span style="color:#0284C7; font-weight:700;">{fmt_brl(gasto_gasolina_vr)}</span><br>
@@ -320,7 +317,7 @@ with st.container(border=True):
                 <span style="background:#0284C7; color:white; padding:4px 12px; border-radius:12px; font-weight:700; font-size:0.85rem;">{pct_lucca:.1f}% Usado</span>
             </div>
             <div style="background-color:#E2E8F0; border-radius:8px; height:10px; width:100%; overflow:hidden; margin-bottom:12px;">
-                <div style="background-color:#0284C7; width:{pct_lucca:.1f}%; height:100%;"></div>
+                <div style="background-color:#0284C7; width:{pct_lucca:.1f}%; height:100%; border-radius:8px;"></div>
             </div>
             <div style="font-size:0.95rem; color:#334155; line-height:1.6;">
                 • <b>Saiu do VR (Flash):</b> <span style="color:#0284C7; font-weight:700;">{fmt_brl(gasto_lucca_vr)}</span><br>
@@ -345,10 +342,10 @@ with st.container(border=True):
     with col_rec_box:
         st.markdown(f"""
         <div style="background:#F8FAFC; padding:18px; border-radius:8px; border:1px solid #CBD5E1;">
-            <div style="font-size:0.9rem; font-weight:bold; color:#0F172A; margin-bottom:4px;">📅 Janela Salário (04/09)</div>
+            <div style="font-size:0.9rem; font-weight:bold; color:#0F172A; margin-bottom:4px;">📅 Janela Salário (Dia 05)</div>
             <div style="font-size:1.3rem; font-weight:800; color:#10B981;">{fmt_brl(entradas_salario_pix)}</div>
             <hr style="margin:8px 0; border:0.5px solid #CBD5E1;">
-            <div style="font-size:0.9rem; font-weight:bold; color:#0F172A; margin-bottom:4px;">📅 Janela Adiantamento (15/09)</div>
+            <div style="font-size:0.9rem; font-weight:bold; color:#0F172A; margin-bottom:4px;">📅 Janela Adiantamento (Dia 15)</div>
             <div style="font-size:1.3rem; font-weight:800; color:#0284C7;">{fmt_brl(entradas_adiantamento_pix)}</div>
             <hr style="margin:8px 0; border:0.5px solid #CBD5E1;">
             <div style="font-size:0.95rem; font-weight:bold; color:#0F172A; margin-bottom:4px;">💰 Total Operacional em Conta</div>
@@ -356,105 +353,164 @@ with st.container(border=True):
         </div>
         """, unsafe_allow_html=True)
 
-# --- 5. MAPEAMENTO DE DÍVIDAS: ATRASADAS E FIXAS MENSAIS ---
+# --- 5. MAPEAMENTO DE DÍVIDAS: ATRASADAS ---
 with st.container(border=True):
-    st.markdown('<div class="card-header-navy">💳 MAPEAMENTO DE DÍVIDAS: ATRASADAS E FIXAS MENSAIS</div>', unsafe_allow_html=True)
+    st.markdown('<div class="card-header-orange">⚠️ MAPEAMENTO DE DÍVIDAS: ATRASADAS</div>', unsafe_allow_html=True)
 
-    col_div1, col_div2 = st.columns(2)
-    
-    # === BLOCO DA ESQUERDA: DÍVIDAS ATRASADAS ===
-    with col_div1:
-        st.markdown("<h4 style='color:#FF5722; margin-bottom:15px;'>⚠️ Dívidas Atrasadas</h4>", unsafe_allow_html=True)
-        if not df_dividas_atrasadas.empty:
-            col_nome = obter_coluna_por_termo(df_dividas_atrasadas, ['credor', 'nome', 'dívida', 'divida', 'descrição'])
-            col_val = obter_coluna_valor_principal(df_dividas_atrasadas)
-            col_acordo = obter_coluna_por_termo(df_dividas_atrasadas, ['acordo', 'entrou'])
+    if not df_dividas_atrasadas.empty:
+        col_nome = obter_coluna_por_termo(df_dividas_atrasadas, ['credor', 'nome', 'dívida', 'divida', 'descrição'])
+        col_val = obter_coluna_valor_principal(df_dividas_atrasadas)
+        col_acordo = obter_coluna_por_termo(df_dividas_atrasadas, ['acordo', 'entrou'])
+        col_num_parc = obter_coluna_por_termo(df_dividas_atrasadas, ['quantidade', 'parcelas', 'num', 'nº'])
+        
+        for idx, row in df_dividas_atrasadas.iterrows():
+            credor = str(row[col_nome]).strip() if col_nome else "Desconhecido"
+            if not credor or credor == 'nan': continue
             
-            for idx, row in df_dividas_atrasadas.iterrows():
-                credor = str(row[col_nome]).strip() if col_nome else "Desconhecido"
-                if not credor or credor == 'nan': continue
-                
-                val_total = limpar_valor(row[col_val])
-                is_acordado = False
-                if col_acordo:
-                    is_acordado = str(row[col_acordo]).strip().lower() == 'sim'
-                
-                qtd_pagas, total_pago = 0, 0.0
-                if is_acordado and not df_saidas.empty and not mask_parcelamentos.empty and col_desc_sai:
-                    df_saidas_parc = df_saidas[mask_parcelamentos]
-                    mask_match = df_saidas_parc[col_desc_sai].astype(str).str.contains(credor.split()[0], case=False, na=False)
-                    qtd_pagas = mask_match.sum()
-                    total_pago = df_saidas_parc[mask_match]['Valor_Clean'].sum()
-                
-                saldo_restante = max(0.0, val_total - total_pago)
-                
-                cor = "#0284C7" if is_acordado else "#FF5722"
-                bg = "#E0F2FE" if is_acordado else "#FEE2E2"
-                status = "Acordo Ativo" if is_acordado else "Pendente"
-                
-                st.markdown(f"""
-                <div style="background:#F8FAFC; padding:16px; border-radius:8px; border:1px solid #CBD5E1; margin-bottom:12px;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                        <span style="font-weight:800; font-size:1.1rem; color:#0F172A;">{credor}</span>
-                        <span style="background:{bg}; color:{cor}; border:1px solid {cor}; padding:2px 8px; border-radius:12px; font-weight:700; font-size:0.75rem;">{status}</span>
-                    </div>
-                    <div style="font-size:0.9rem; color:#334155; line-height:1.6;">
-                        • <b>Valor Total:</b> <span style="color:#0F172A; font-weight:700;">{fmt_brl(val_total)}</span><br>
-                        • <b>Parcelas Pagas:</b> {qtd_pagas}<br>
-                        • <b>Falta Pagar:</b> <span style="color:#FF5722; font-weight:700;">{fmt_brl(saldo_restante)}</span>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-        else:
-            st.info("Aba 'Dívidas atrasadas' não encontrada ou vazia.")
-
-    # === BLOCO DA DIREITA: DÍVIDAS FIXAS ===
-    with col_div2:
-        st.markdown("<h4 style='color:#10B981; margin-bottom:15px;'>✅ Dívidas Fixas Mensais</h4>", unsafe_allow_html=True)
-        if not df_dividas_fixas.empty:
-            col_nome_fixa = obter_coluna_por_termo(df_dividas_fixas, ['descrição', 'descricao', 'credor', 'nome'])
-            col_val_fixa = obter_coluna_valor_principal(df_dividas_fixas)
-            col_parc_fixa = obter_coluna_por_termo(df_dividas_fixas, ['possui parcelamento', 'parcelamento'])
-            col_inicio_fixa = obter_coluna_por_termo(df_dividas_fixas, ['inicio', 'início'])
-            col_fim_fixa = obter_coluna_data_fim(df_dividas_fixas)
+            val_total = limpar_valor(row[col_val])
+            if val_total <= 0: continue
             
-            for idx, row in df_dividas_fixas.iterrows():
-                desc = str(row[col_nome_fixa]).strip() if col_nome_fixa else "Desconhecido"
-                if not desc or desc == 'nan': continue
-                
-                val_parcela = limpar_valor(row[col_val_fixa])
-                is_parcelado = False
-                if col_parc_fixa:
-                    is_parcelado = str(row[col_parc_fixa]).strip().lower() == 'sim'
-                
-                qtd_pagas, total_pago = 0, 0.0
-                if is_parcelado and not df_saidas.empty and not mask_parcelamentos.empty and col_desc_sai:
-                    df_saidas_parc = df_saidas[mask_parcelamentos]
-                    mask_match = df_saidas_parc[col_desc_sai].astype(str).str.contains(desc.split()[0], case=False, na=False)
-                    qtd_pagas = mask_match.sum()
-                    total_pago = df_saidas_parc[mask_match]['Valor_Clean'].sum()
-                
-                data_inicio = str(row[col_inicio_fixa]) if col_inicio_fixa and pd.notna(row[col_inicio_fixa]) else "-"
-                data_fim = str(row[col_fim_fixa]) if col_fim_fixa and pd.notna(row[col_fim_fixa]) else "-"
-                
-                st.markdown(f"""
-                <div style="background:#F8FAFC; padding:16px; border-radius:8px; border:1px solid #CBD5E1; margin-bottom:12px;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                        <span style="font-weight:800; font-size:1.1rem; color:#0F172A;">{desc}</span>
-                        <span style="background:#D1FAE5; color:#059669; border:1px solid #10B981; padding:2px 8px; border-radius:12px; font-weight:700; font-size:0.75rem;">Parcelamento Fixo</span>
-                    </div>
-                    <div style="font-size:0.9rem; color:#334155; line-height:1.6;">
-                        • <b>Valor da Parcela (Mês):</b> <span style="color:#0F172A; font-weight:700;">{fmt_brl(val_parcela)}</span><br>
-                        • <b>Parcelas Pagas (Confirmadas Saídas):</b> {qtd_pagas}<br>
-                        • <b>Início do Pagamento:</b> {data_inicio}<br>
-                        • <b>Finaliza em:</b> {data_fim}
-                    </div>
+            is_acordado = False
+            if col_acordo:
+                is_acordado = str(row[col_acordo]).strip().lower() == 'sim'
+            
+            qtd_pagas, total_pago = 0, 0.0
+            
+            # Cruzamento com aba saídas (SE Acordado = Sim E Saída = Parcelamento)
+            if is_acordado and not df_saidas.empty and not mask_parcelamentos.empty and col_desc_sai:
+                df_saidas_parc = df_saidas[mask_parcelamentos]
+                # Busca pelo nome exato do credor na descrição da saída
+                mask_match = df_saidas_parc[col_desc_sai].astype(str).str.contains(credor, case=False, na=False)
+                qtd_pagas = mask_match.sum()
+                total_pago = df_saidas_parc[mask_match]['Valor_Clean'].sum()
+            
+            num_parc_total = 1
+            if col_num_parc and pd.notna(row[col_num_parc]):
+                v = limpar_valor(row[col_num_parc])
+                if v > 0: num_parc_total = int(v)
+            if is_acordado and num_parc_total <= 1:
+                num_parc_total = 36 # Default
+            
+            saldo_restante = max(0.0, val_total - total_pago)
+            faltam_pagar = max(0, num_parc_total - qtd_pagas)
+            
+            cor = "#0284C7" if is_acordado else "#FF5722"
+            bg = "#E0F2FE" if is_acordado else "#FEE2E2"
+            status = "Acordado / Parcelado" if is_acordado else "Pendente"
+            
+            html_atr = f"""
+            <div style="background:#F8FAFC; padding:18px; border-radius:8px; border:1px solid #CBD5E1; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                <div style="flex: 1; min-width: 250px;">
+                    <span style="font-weight:800; font-size:1.1rem; color:#0F172A;">{credor}</span><br>
+                    <span style="background:{bg}; color:{cor}; border:1px solid {cor}; padding:2px 8px; border-radius:12px; font-weight:700; font-size:0.75rem;">{status}</span>
                 </div>
-                """, unsafe_allow_html=True)
-        else:
-            st.info("Aba 'Dívidas Fixas' não encontrada ou vazia.")
+                <div style="flex: 1; min-width: 150px; font-size:0.95rem; color:#334155;">
+                    <b>Valor Total:</b> <span style="color:#0F172A; font-weight:700;">{fmt_brl(val_total)}</span>
+                </div>
+            """
+            
+            if is_acordado:
+                html_atr += f"""
+                <div style="flex: 1; min-width: 150px; font-size:0.95rem; color:#334155;">
+                    <b>Já pago:</b> {qtd_pagas} parcela(s)<br>
+                    <span style="color:#10B981; font-weight:700;">{fmt_brl(total_pago)}</span>
+                </div>
+                <div style="flex: 1; min-width: 150px; font-size:0.95rem; color:#334155;">
+                    <b>Falta pagar:</b> {faltam_pagar} parcela(s)<br>
+                    <span style="color:#FF5722; font-weight:700;">{fmt_brl(saldo_restante)}</span>
+                </div>
+                """
+            else:
+                html_atr += f"""
+                <div style="flex: 2; min-width: 300px; font-size:0.95rem; color:#FF5722; font-weight:600;">
+                    Aguardando acordo / negociação para este credor.
+                </div>
+                """
+            html_atr += "</div>"
+            st.markdown(html_atr, unsafe_allow_html=True)
+    else:
+        st.info("Aba 'Dívidas atrasadas' não encontrada ou vazia.")
 
-# --- 6. DISTRIBUIÇÃO VISUAL DE GASTOS POR TIPO DE SAÍDA (TREEMAP) ---
+
+# --- 6. CUSTOS E PARCELAMENTOS ATIVOS ---
+with st.container(border=True):
+    st.markdown('<div class="card-header-navy">✅ CUSTOS / PARCELAMENTOS ATIVOS (POR JANELA)</div>', unsafe_allow_html=True)
+
+    if not df_dividas_fixas.empty:
+        col_nome_fixa = obter_coluna_por_termo(df_dividas_fixas, ['descrição', 'descricao', 'credor', 'nome'])
+        col_val_fixa = obter_coluna_valor_principal(df_dividas_fixas)
+        col_parc_fixa = obter_coluna_por_termo(df_dividas_fixas, ['possui parcelamento', 'parcelamento'])
+        col_inicio_fixa = obter_coluna_por_termo(df_dividas_fixas, ['inicio', 'início'])
+        col_fim_fixa = obter_coluna_data_fim(df_dividas_fixas)
+        col_janela_fixa = obter_coluna_por_termo(df_dividas_fixas, ['janela'])
+        
+        itens_salario = []
+        itens_adiantamento = []
+        
+        for idx, row in df_dividas_fixas.iterrows():
+            desc = str(row[col_nome_fixa]).strip() if col_nome_fixa else "Desconhecido"
+            if not desc or desc == 'nan': continue
+            
+            val_parcela = limpar_valor(row[col_val_fixa])
+            janela = str(row[col_janela_fixa]).lower() if col_janela_fixa else ""
+            
+            is_parcelado = False
+            if col_parc_fixa:
+                is_parcelado = str(row[col_parc_fixa]).strip().lower() == 'sim'
+            
+            qtd_pagas, total_pago = 0, 0.0
+            if is_parcelado and not df_saidas.empty and not mask_parcelamentos.empty and col_desc_sai:
+                df_saidas_parc = df_saidas[mask_parcelamentos]
+                mask_match = df_saidas_parc[col_desc_sai].astype(str).str.contains(desc, case=False, na=False)
+                qtd_pagas = mask_match.sum()
+                total_pago = df_saidas_parc[mask_match]['Valor_Clean'].sum()
+            
+            data_inicio = str(row[col_inicio_fixa]) if col_inicio_fixa and pd.notna(row[col_inicio_fixa]) else "-"
+            data_fim = str(row[col_fim_fixa]) if col_fim_fixa and pd.notna(row[col_fim_fixa]) else "-"
+            
+            # HTML Build
+            html_item = f"""
+            <div style="background:#F8FAFC; padding:16px; border-radius:8px; border:1px solid #CBD5E1; margin-bottom:10px;">
+                <div style="font-weight:800; font-size:1.1rem; color:#0F172A; margin-bottom:4px;">{desc}</div>
+                <div style="font-size:0.95rem; color:#334155;">
+                    • <b>Valor a Pagar (Mês):</b> <span style="color:#0F172A; font-weight:700;">{fmt_brl(val_parcela)}</span><br>
+            """
+            if is_parcelado:
+                html_item += f"""
+                    • <b>Início do Pagamento:</b> {data_inicio} (1ª parcela)<br>
+                    • <b>Finaliza em:</b> {data_fim}<br>
+                    • <b>Parcelas Confirmadas no Mês:</b> <span style="color:#10B981; font-weight:700;">{qtd_pagas} paga(s)</span>
+                """
+            else:
+                html_item += "• <b>Custo Fixo Contínuo</b> (Sem data final)"
+                
+            html_item += "</div></div>"
+            
+            if 'salário' in janela or 'salario' in janela or '05' in janela:
+                itens_salario.append(html_item)
+            else:
+                # Default vai para Adiantamento se não for salário
+                itens_adiantamento.append(html_item)
+                
+        c_fix1, c_fix2 = st.columns(2)
+        with c_fix1:
+            st.markdown("<div style='font-size:1.1rem; font-weight:800; color:#0F172A; margin-bottom:12px; border-bottom:2px solid #10B981; padding-bottom:6px;'>💳 Pagamentos Janela Salário (Dia 05)</div>", unsafe_allow_html=True)
+            if itens_salario:
+                for it in itens_salario: st.markdown(it, unsafe_allow_html=True)
+            else:
+                st.write("Sem registros para esta janela.")
+                
+        with c_fix2:
+            st.markdown("<div style='font-size:1.1rem; font-weight:800; color:#0F172A; margin-bottom:12px; border-bottom:2px solid #0284C7; padding-bottom:6px;'>💳 Pagamentos Janela Adiantamento (Dia 15)</div>", unsafe_allow_html=True)
+            if itens_adiantamento:
+                for it in itens_adiantamento: st.markdown(it, unsafe_allow_html=True)
+            else:
+                st.write("Sem registros para esta janela.")
+    else:
+        st.info("Aba 'Dívidas Fixas' não encontrada ou vazia.")
+
+
+# --- 7. DISTRIBUIÇÃO VISUAL DE GASTOS POR TIPO DE SAÍDA (TREEMAP) ---
 with st.container(border=True):
     st.markdown('<div class="card-header-navy">📊 DISTRIBUIÇÃO VISUAL DE GASTOS POR TIPO DE SAÍDA (TREEMAP)</div>', unsafe_allow_html=True)
 
