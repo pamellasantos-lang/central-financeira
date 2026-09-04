@@ -176,7 +176,7 @@ if not df_entradas.empty:
     except Exception:
         pass
 
-# Valores padrões calculados caso ocorra oscilação na conexão com a planilha
+# Fallbacks de cálculo para contingência
 if total_entradas_pix == 0: total_entradas_pix = 3902.30
 if total_entradas_vr == 0: total_entradas_vr = 682.50
 if entradas_salario_pix == 0: entradas_salario_pix = 2052.30
@@ -358,8 +358,8 @@ with st.container(border=True):
             st.plotly_chart(fig_div, use_container_width=True, config={'displayModeBar': False})
         except Exception:
             st.write("Processando visualização das dívidas...")
-else:
-    st.write("Sincronizando dados de dívidas da planilha...")
+    else:
+        st.write("Sincronizando dados de dívidas da planilha...")
 
 # --- 5. GRÁFICO DE PORCENTAGEM SEPARADO POR TIPO DE GASTO ---
 with st.container(border=True):
@@ -386,8 +386,8 @@ with st.container(border=True):
             st.plotly_chart(fig_pie, use_container_width=True, config={'displayModeBar': False})
         except Exception:
             st.write("Processando distribuição de saídas...")
-else:
-    df_mock = pd.DataFrame({'Tipo': ['Fixos Essenciais', 'Parcelamentos Fixos', 'Variáveis'], 'Valor': [880.0, 1550.0, 258.57]})
-    fig_pie = px.pie(df_mock, values='Valor', names='Tipo', hole=0.5, color_discrete_sequence=['#FF5722', '#0F172A', '#10B981'])
-    fig_pie.update_layout(height=280, margin=dict(l=10, r=10, t=10, b=10), paper_bgcolor='rgba(0,0,0,0)', showlegend=True)
-    st.plotly_chart(fig_pie, use_container_width=True, config={'displayModeBar': False})
+    else:
+        df_mock = pd.DataFrame({'Tipo': ['Fixos Essenciais', 'Parcelamentos Fixos', 'Variáveis'], 'Valor': [880.0, 1550.0, 258.57]})
+        fig_pie = px.pie(df_mock, values='Valor', names='Tipo', hole=0.5, color_discrete_sequence=['#FF5722', '#0F172A', '#10B981'])
+        fig_pie.update_layout(height=280, margin=dict(l=10, r=10, t=10, b=10), paper_bgcolor='rgba(0,0,0,0)', showlegend=True)
+        st.plotly_chart(fig_pie, use_container_width=True, config={'displayModeBar': False})
