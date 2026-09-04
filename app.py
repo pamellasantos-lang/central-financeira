@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import urllib.parse
+import re
 from datetime import datetime
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
@@ -144,7 +145,7 @@ df_dividas_fixas = carregar_aba(["Dividas Fixas", "Dívidas Fixas", "Parcelament
 df_entradas = carregar_aba(["Entradas", "Entradas Agosto"])
 df_saidas = carregar_aba(["Saídas", "Saidas"])
 
-# --- HEADER ALINHADO À ESQUERDA ---
+# --- HEADER: ALINHADO À ESQUERDA ---
 with st.container(border=True):
     col_titulo, col_filtros = st.columns([1.2, 2])
     with col_titulo:
@@ -242,7 +243,7 @@ sobra_salario = entradas_salario_pix - saidas_salario_pix
 sobra_adiantamento = entradas_adiantamento_pix - saidas_adiantamento_pix
 
 # ====================================================================
-# ORDEM DOS QUADROS SOLICITADA
+# ORDEM FIXADA DOS QUADROS
 # ====================================================================
 
 # --- 1. RESUMO EXECUTIVO GERAL ---
@@ -363,54 +364,81 @@ with st.container(border=True):
         col_val_total_div = obter_coluna_valor_principal(df_dividas_atrasadas)
         col_acordo = obter_coluna_por_termo(df_dividas_atrasadas, ['entrou em acordo', 'acordo'])
         col_parc_feito = obter_coluna_por_termo(df_dividas_atrasadas, ['parcelamento feito', 'parcelamento'])
-        col_inicio_div = obter_coluna_por_termo(df_dividas_atrasadas, ['inicio', 'início'])
-        col_fim_div = obter_coluna_data_fim(df_dividas_atrasadas)
+        col_num_parc = obter_coluna_por_termo(df_dividas_atrasadas, ['quantidade', 'num', 'nº'])
         
         for idx, row in df_dividas_atrasadas.iterrows():
-            nome_divida = str(row[col_nome_div]).strip() if col_nome_div and pd.notna(row[col_nome_div]) else "Dívida"
-            credor_nome = str(row[col_credor_div]).strip() if col_credor_div and pd.notna(row[col_credor_div]) else nome_divida
+            nome_divida = str(row[col_nome_div]).strip() if col_nome_div and pd.notna(row[col_nome_div]) else ""
+            credor_nome = str(row[col_credor_div]).strip() if col_credor_div and pd.notna(row[col_credor_div]) else ""
             
-            if not credor_nome or credor_nome == 'nan': continue
+            if not nome_divida or nome_divida.lower() == 'nan':
+                nome_divida = credor_nome
+            if not credor_nome or credor_nome.lower() == 'nan':
+                credor_nome = nome_divida
+            if not nome_divida or nome_divida.lower() == 'nan': continue
             
             val_total = limpar_valor(row[col_val_total_div]) if col_val_total_div else 0.0
             if val_total <= 0: continue
             
             is_acordado = False
             if col_acordo and pd.notna(row[col_acordo]):
-                is_acordado = str(row[col_acordo]).strip().lower() == 'sim'
+                is_acordado = str(row[col_acordo]).strip().lower() in ['sim', 's', 'true', '1', 'ativo']
             
-            qtd_pagas, total_pago = 0, 0.0
-            tot_parc = 1
+            # Tenta extrair o total de parcelas de "Parcelamento feito" (ex: "36x de R$ 204,41")
+            num_parc_total = 1
+            parc_feito_txt = str(row[col_parc_feito]) if col_parc_feito and pd.notna(row[col_parc_feito]) else "-"
+            match_parc = re.search(r'(\d+)\s*x', parc_feito_txt, re.IGNORECASE)
+            if match_parc:
+                num_parc_total = int(match_parc.group(1))
+            elif col_num_parc and pd.notna(row[col_num_parc]):
+                v = limpar_valor(row[col_num_parc])
+                if v > 0: num_parc_total = int(v)
+
+            qtd_pagas = 0
+            total_pago = 0.0
             
-            # Cruzamento direto: Credor das dívidas == Descrição do Gasto das Saídas
+            # Cruzamento exato com Saídas usando 'Credor' == 'Descrição do Gasto'
             if is_acordado and not df_saidas.empty and col_desc_sai:
-                mask_match = df_saidas[col_desc_sai].astype(str).str.contains(credor_nome, case=False, na=False)
+                termos_busca = [t for t in [credor_nome, nome_divida] if t and t.lower() != 'nan']
+                
+                def bate_desc(r_sai):
+                    desc_s = str(r_sai[col_desc_sai]).lower().strip() if col_desc_sai else ""
+                    for tb in termos_busca:
+                        tb_clean = tb.lower().replace('empréstimo', '').replace('emprestimo', '').replace('cartão', '').replace('cartao', '').strip()
+                        if tb_clean and tb_clean in desc_s: return True
+                        if tb.lower() in desc_s: return True
+                    return False
+                
+                mask_match = df_saidas.apply(bate_desc, axis=1)
                 df_matches = df_saidas[mask_match]
                 
                 if not df_matches.empty:
                     total_pago = df_matches['Valor_Clean'].sum()
-                    qtd_pagas = len(df_matches)
                     
-                    # Leitura da coluna Parcelamento nas Saídas (ex: "1/36")
-                    if col_parc_sai and col_parc_sai in df_matches.columns:
-                        for p_str in df_matches[col_parc_sai].dropna().astype(str):
-                            if '/' in p_str:
-                                try:
-                                    partes = p_str.split('/')
-                                    curr_p = int(partes[0].strip())
-                                    tot_p = int(partes[1].strip())
-                                    if curr_p > 0:
-                                        qtd_pagas = max(qtd_pagas, curr_p)
-                                    if tot_p > 1:
-                                        tot_parc = tot_p
-                                except: pass
+                    # Tenta ler "1/36" da coluna Parcelamento nas Saídas
+                    for _, r_match in df_matches.iterrows():
+                        p_str = ""
+                        if col_parc_sai and col_parc_sai in r_match and pd.notna(r_match[col_parc_sai]):
+                            p_str = str(r_match[col_parc_sai]).strip()
+                        
+                        if '/' in p_str:
+                            try:
+                                partes = p_str.split('/')
+                                p_paga = int(partes[0].strip())
+                                p_tot = int(partes[1].strip())
+                                if p_paga > qtd_pagas:
+                                    qtd_pagas = p_paga
+                                if p_tot > num_parc_total:
+                                    num_parc_total = p_tot
+                            except:
+                                qtd_pagas = max(qtd_pagas, len(df_matches))
+                        else:
+                            qtd_pagas = max(qtd_pagas, len(df_matches))
+            
+            if is_acordado and num_parc_total <= 1:
+                num_parc_total = 36 # Default de contingência
             
             saldo_restante = max(0.0, val_total - total_pago)
-            faltam_pagar = max(0, tot_parc - qtd_pagas)
-            
-            parc_feito_txt = str(row[col_parc_feito]) if col_parc_feito and pd.notna(row[col_parc_feito]) else "-"
-            inicio_txt = str(row[col_inicio_div]) if col_inicio_div and pd.notna(row[col_inicio_div]) else "-"
-            fim_txt = str(row[col_fim_div]) if col_fim_div and pd.notna(row[col_fim_div]) else "-"
+            faltam_pagar = max(0, num_parc_total - qtd_pagas)
             
             cor = "#0284C7" if is_acordado else "#FF5722"
             bg = "#E0F2FE" if is_acordado else "#FEE2E2"
@@ -475,7 +503,7 @@ with st.container(border=True):
             
             qtd_pagas, total_pago = 0, 0.0
             if is_parcelado and not df_saidas.empty and col_desc_sai:
-                mask_match = df_saidas[col_desc_sai].astype(str).str.contains(desc, case=False, na=False)
+                mask_match = df_saidas[col_desc_sai].astype(str).str.contains(desc.split()[0], case=False, na=False)
                 qtd_pagas = mask_match.sum()
                 total_pago = df_saidas[mask_match]['Valor_Clean'].sum()
             
