@@ -13,10 +13,10 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- ESTILIZAÇÃO CSS EXECUTIVA COM ESPAÇAMENTOS FIXOS ---
+# --- ESTILIZAÇÃO CSS EXECUTIVA COM ESPAÇAMENTOS RIGOROSOS ---
 st.markdown("""
 <style>
-    /* Margens globais com espaço de respiro no topo */
+    /* Margens globais com espaço no topo */
     .block-container {
         padding-top: 1.5rem !important;
         padding-bottom: 3rem !important;
@@ -32,7 +32,7 @@ st.markdown("""
     [data-testid="collapsedControl"] {display: none;}
     section[data-testid="stSidebar"] {display: none;}
     
-    /* Regra Fixa de Espaçamento Entre Quadros (Containers) */
+    /* Espaçamento Rígido e Fixo Entre Quadros (Containers) */
     [data-testid="stVerticalBlockBorderWrapper"] {
         background-color: #FFFFFF !important;
         border-radius: 12px !important;
@@ -40,11 +40,11 @@ st.markdown("""
         box-shadow: 0 4px 12px rgba(0,0,0,0.05) !important;
         padding: 0px !important;
         overflow: hidden !important;
-        margin-bottom: 35px !important; /* Espaçamento grande e rígido entre blocos */
+        margin-bottom: 35px !important; /* Espaçamento grande garantido */
     }
     
     [data-testid="stVerticalBlockBorderWrapper"] > div {
-        padding: 24px 28px !important; /* Respiro interno das caixas */
+        padding: 24px 28px !important;
     }
 
     /* Cabeçalhos dos Cards */
@@ -85,7 +85,7 @@ st.markdown("""
     .kpi-value-main { font-size: 1.8rem; font-weight: 800; color: #0F172A; }
     .kpi-subtext { font-size: 0.85rem; font-weight: 600; color: #64748B; margin-top: 4px; }
     
-    /* Layout Padrão do Topo (Alinhado à Esquerda) */
+    /* Quadradinhos para Seleção do Mês */
     div[data-testid="stRadio"] > div { flex-direction: row; flex-wrap: wrap; gap: 8px; }
     div[data-testid="stRadio"] div[role="radiogroup"] > label { 
         background-color: #F8FAFC; border: 1px solid #CBD5E1; padding: 6px 14px; border-radius: 6px; 
@@ -99,7 +99,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- FUNÇÕES DE LIMPEZA E FORMATAÇÃO ---
+# --- FUNÇÕES AUXILIARES TOTAIS (DECLARADAS NO ESCOPO GLOBAL SUPREMO) ---
 def limpar_valor(val):
     if pd.isna(val): return 0.0
     if isinstance(val, (int, float)): return float(val)
@@ -125,6 +125,12 @@ def obter_coluna_por_termo(df, termos):
         if any(t in c.lower() for t in termos): return c
     return None
 
+def obter_coluna_data_fim(df):
+    if df.empty: return None
+    cols = [c for c in df.columns if any(p in c.lower() for p in ['fim', 'final', 'término', 'termino', 'última', 'ultima', 'quitação', 'finaliza'])]
+    if cols: return cols[-1]
+    return None
+
 # --- CONEXÃO COM O GOOGLE SHEETS ---
 SHEET_ID = "1Y7EsUDd9J_liLwwTbRdjM2lM_XcdsWr_kYNUC-MAZsY"
 
@@ -143,7 +149,7 @@ df_dividas_fixas = carregar_aba(["Dividas Fixas", "Dívidas Fixas", "Parcelament
 df_entradas = carregar_aba(["Entradas", "Entradas Agosto"])
 df_saidas = carregar_aba(["Saídas", "Saidas"])
 
-# --- HEADER: ALINHADO À ESQUERDA (PADRÃO) ---
+# --- HEADER: MODELO ORIGINAL ALINHADO À ESQUERDA ---
 with st.container(border=True):
     col_titulo, col_filtros = st.columns([1.2, 2])
     with col_titulo:
@@ -191,7 +197,6 @@ gasto_gasolina_vr, gasto_gasolina_pix = 0.0, 0.0
 gasto_lucca_vr, gasto_lucca_pix = 0.0, 0.0
 mask_parcelamentos = pd.Series(dtype=bool)
 col_desc_sai = None
-col_tipo_gasto_sai = None
 
 if not df_saidas.empty:
     try:
@@ -210,9 +215,9 @@ if not df_saidas.empty:
         df_saidas['Dia'] = pd.to_datetime(df_saidas[col_data], format='%d/%m/%Y', errors='coerce').dt.day
         
         txt_sai = df_saidas.astype(str).agg(' '.join, axis=1)
+        
         mask_sai_pix = df_saidas[col_tipo_pag].astype(str).str.contains('PIX|Dinheiro|Conta|Débito', case=False, na=False) | txt_sai.str.contains('PIX', case=False, na=False)
         mask_sai_vr = df_saidas[col_tipo_pag].astype(str).str.contains('VR|Flash|Crédito', case=False, na=False)
-        
         total_saidas_pix = df_saidas[mask_sai_pix]['Valor_Clean'].sum()
         
         df_saidas['Dia'] = df_saidas['Dia'].fillna(1)
@@ -226,7 +231,6 @@ if not df_saidas.empty:
         gasto_lucca_vr = df_saidas[mask_lucca & mask_sai_vr]['Valor_Clean'].sum()
         gasto_lucca_pix = df_saidas[mask_lucca & mask_sai_pix]['Valor_Clean'].sum()
         
-        # Filtro EXATO para Parcelamentos (Usado na Lógica das Dívidas)
         mask_parcelamentos = df_saidas[col_tipo_gasto_sai].astype(str).str.contains('parcelamento', case=False, na=False)
     except: pass
 
@@ -241,7 +245,7 @@ sobra_salario = entradas_salario_pix - saidas_salario_pix
 sobra_adiantamento = entradas_adiantamento_pix - saidas_adiantamento_pix
 
 # ====================================================================
-# AQUI COMEÇA A ORDEM EXATA DOS QUADROS QUE VOCÊ SOLICITOU
+# ORDEM ESTRITA DOS QUADROS SOLICITADA
 # ====================================================================
 
 # --- 1. RESUMO EXECUTIVO GERAL ---
@@ -298,7 +302,7 @@ with st.container(border=True):
                 <span style="background:#FF5722; color:white; padding:4px 12px; border-radius:12px; font-weight:700; font-size:0.85rem;">{pct_gas:.1f}% Usado</span>
             </div>
             <div style="background-color:#E2E8F0; border-radius:8px; height:10px; width:100%; overflow:hidden; margin-bottom:12px;">
-                <div style="background-color:#FF5722; width:{pct_gas:.1f}%; height:100%; border-radius:8px;"></div>
+                <div style="background-color:#FF5722; width:{pct_gas:.1f}%; height:100%;"></div>
             </div>
             <div style="font-size:0.95rem; color:#334155; line-height:1.6;">
                 • <b>Saiu do VR (Flash):</b> <span style="color:#0284C7; font-weight:700;">{fmt_brl(gasto_gasolina_vr)}</span><br>
@@ -316,7 +320,7 @@ with st.container(border=True):
                 <span style="background:#0284C7; color:white; padding:4px 12px; border-radius:12px; font-weight:700; font-size:0.85rem;">{pct_lucca:.1f}% Usado</span>
             </div>
             <div style="background-color:#E2E8F0; border-radius:8px; height:10px; width:100%; overflow:hidden; margin-bottom:12px;">
-                <div style="background-color:#0284C7; width:{pct_lucca:.1f}%; height:100%; border-radius:8px;"></div>
+                <div style="background-color:#0284C7; width:{pct_lucca:.1f}%; height:100%;"></div>
             </div>
             <div style="font-size:0.95rem; color:#334155; line-height:1.6;">
                 • <b>Saiu do VR (Flash):</b> <span style="color:#0284C7; font-weight:700;">{fmt_brl(gasto_lucca_vr)}</span><br>
@@ -341,10 +345,10 @@ with st.container(border=True):
     with col_rec_box:
         st.markdown(f"""
         <div style="background:#F8FAFC; padding:18px; border-radius:8px; border:1px solid #CBD5E1;">
-            <div style="font-size:0.9rem; font-weight:bold; color:#0F172A; margin-bottom:4px;">📅 Janela Salário (Dia 05)</div>
+            <div style="font-size:0.9rem; font-weight:bold; color:#0F172A; margin-bottom:4px;">📅 Janela Salário (04/09)</div>
             <div style="font-size:1.3rem; font-weight:800; color:#10B981;">{fmt_brl(entradas_salario_pix)}</div>
             <hr style="margin:8px 0; border:0.5px solid #CBD5E1;">
-            <div style="font-size:0.9rem; font-weight:bold; color:#0F172A; margin-bottom:4px;">📅 Janela Adiantamento (Dia 15)</div>
+            <div style="font-size:0.9rem; font-weight:bold; color:#0F172A; margin-bottom:4px;">📅 Janela Adiantamento (15/09)</div>
             <div style="font-size:1.3rem; font-weight:800; color:#0284C7;">{fmt_brl(entradas_adiantamento_pix)}</div>
             <hr style="margin:8px 0; border:0.5px solid #CBD5E1;">
             <div style="font-size:0.95rem; font-weight:bold; color:#0F172A; margin-bottom:4px;">💰 Total Operacional em Conta</div>
@@ -364,7 +368,7 @@ with st.container(border=True):
         if not df_dividas_atrasadas.empty:
             col_nome = obter_coluna_por_termo(df_dividas_atrasadas, ['credor', 'nome', 'dívida', 'divida', 'descrição'])
             col_val = obter_coluna_valor_principal(df_dividas_atrasadas)
-            col_acordo = obter_coluna_por_termo(df_dividas_atrasadas, ['acordo'])
+            col_acordo = obter_coluna_por_termo(df_dividas_atrasadas, ['acordo', 'entrou'])
             
             for idx, row in df_dividas_atrasadas.iterrows():
                 credor = str(row[col_nome]).strip() if col_nome else "Desconhecido"
@@ -408,9 +412,9 @@ with st.container(border=True):
     with col_div2:
         st.markdown("<h4 style='color:#10B981; margin-bottom:15px;'>✅ Dívidas Fixas Mensais</h4>", unsafe_allow_html=True)
         if not df_dividas_fixas.empty:
-            col_nome_fixa = obter_coluna_por_termo(df_dividas_fixas, ['descrição', 'credor', 'nome'])
+            col_nome_fixa = obter_coluna_por_termo(df_dividas_fixas, ['descrição', 'descricao', 'credor', 'nome'])
             col_val_fixa = obter_coluna_valor_principal(df_dividas_fixas)
-            col_parc_fixa = obter_coluna_por_termo(df_dividas_fixas, ['possui parcelamento'])
+            col_parc_fixa = obter_coluna_por_termo(df_dividas_fixas, ['possui parcelamento', 'parcelamento'])
             col_inicio_fixa = obter_coluna_por_termo(df_dividas_fixas, ['inicio', 'início'])
             col_fim_fixa = obter_coluna_data_fim(df_dividas_fixas)
             
@@ -450,8 +454,7 @@ with st.container(border=True):
         else:
             st.info("Aba 'Dívidas Fixas' não encontrada ou vazia.")
 
-
-# --- 7. DISTRIBUIÇÃO VISUAL DE GASTOS POR TIPO DE SAÍDA (TREEMAP) ---
+# --- 6. DISTRIBUIÇÃO VISUAL DE GASTOS POR TIPO DE SAÍDA (TREEMAP) ---
 with st.container(border=True):
     st.markdown('<div class="card-header-navy">📊 DISTRIBUIÇÃO VISUAL DE GASTOS POR TIPO DE SAÍDA (TREEMAP)</div>', unsafe_allow_html=True)
 
