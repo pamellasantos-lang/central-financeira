@@ -142,23 +142,26 @@ st.markdown("""
         border-right: 11px solid #CBD5E1;
     }
     
-    /* BOTÕES DE MÊS COMPACTOS E EM LINHA ÚNICA */
+    /* BOTÕES DE MÊS COMPACTOS E IMPEDIDOS DE QUEBRAR TEXTO */
     div[data-testid="stRadio"] > div { 
         flex-direction: row; 
         flex-wrap: nowrap; 
-        gap: 5px; 
+        gap: 4px; 
         justify-content: flex-start; 
-        overflow-x: auto;
+        align-items: center;
     }
     div[data-testid="stRadio"] div[role="radiogroup"] > label { 
         background-color: #F8FAFC; 
         border: 1px solid #CBD5E1; 
-        padding: 5px 10px; 
+        padding: 4px 8px !important; 
         border-radius: 6px; 
         cursor: pointer; 
         font-weight: 700; 
-        font-size: 0.8rem; 
+        font-size: 0.78rem !important; 
         color: #334155;
+        white-space: nowrap !important;
+        text-align: center !important;
+        min-width: auto !important;
     }
     div[data-testid="stRadio"] div[role="radiogroup"] > label > div:first-child { display: none !important; }
     div[data-testid="stRadio"] div[role="radiogroup"] > label[data-checked="true"] { 
@@ -325,7 +328,7 @@ else:
 img_base64 = get_image_base64(avatar_file)
 avatar_src = f"data:image/png;base64,{img_base64}" if img_base64 else "https://cdn-icons-png.flaticon.com/512/4140/4140048.png"
 
-# --- HEADER REORGANIZADO COM FILTROS ENFILEIRADOS EMBAIXO DO BALÃO ---
+# --- HEADER REORGANIZADO COM FILTROS EMBAIXO DO BALÃO ---
 with st.container(border=True):
     col_av, col_content = st.columns([1.4, 7.6])
     
@@ -347,13 +350,13 @@ with st.container(border=True):
         </div>
         """, unsafe_allow_html=True)
         
-        st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
+        st.markdown("<div style='margin-top: 8px;'></div>", unsafe_allow_html=True)
         
-        c_ano, c_mes = st.columns([1.2, 7.8])
+        c_ano, c_mes = st.columns([1.1, 7.9])
         with c_ano:
             ano_selecionado = st.selectbox("Ano", [2026, 2027], index=0, label_visibility="collapsed")
         with c_mes:
-            meses_botoes = ["jan.", "fev.", "mar.", "abr.", "mai.", "jun.", "jul.", "ago.", "set.", "out.", "nov.", "dez."]
+            meses_botoes = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"]
             mes_selecionado = st.radio("Mês", meses_botoes, index=8, horizontal=True, label_visibility="collapsed")
 
 # --- 1. RESUMO EXECUTIVO GERAL ---
@@ -722,7 +725,7 @@ with st.container(border=True):
             if pct_gasto_total <= 60 and dia_atual <= 15:
                 status_mes_bottom = "🟢 <b style='color:#10B981;'>Mês sob controle!</b> Estamos no início do mês e os gastos estão bem moderados. Excelente ritmo de economia!"
             elif pct_gasto_total > 75 or (pct_gasto_total > 50 and dia_atual <= 10):
-                status_mes_bottom = "🔴 <b style='color:#FF5722;'>Alerta Vermelho!</b> Estamos na primeira quinzena e uma grande parte da sua receita já foi comprometida. Sugiro pisar no freio nas despesas variáveis."
+                status_mes_bottom = "🔴 <b style='color:#FF5722;'>Alerta Vermelho!</b> Estamos na primeira quinzena e uma grande parte da sua receita já foi compromised. Sugiro pisar no freio nas despesas variáveis."
             elif pct_gasto_total >= 90:
                 status_mes_bottom = "🔴 <b style='color:#FF5722;'>Orçamento no Limite!</b> Você está gastando quase tudo que entrou. Evite qualquer compra não essencial agora."
             elif pct_gasto_total < 80 and dia_atual > 15:
