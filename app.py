@@ -116,14 +116,17 @@ def obter_coluna_valor_principal(df):
     return df.columns[-1]
 
 def obter_coluna_por_termo(df, termos):
+    """Nova função inteligente que prioriza termos compostos (ex: Descrição do Gasto) antes de termos isolados (ex: Gasto)."""
     if df.empty: return None
-    for c in df.columns:
-        if any(t in c.lower() for t in termos): return c
+    for t in termos:
+        for c in df.columns:
+            if t in c.lower():
+                return c
     return None
 
 def obter_coluna_data_fim(df):
     if df.empty: return None
-    cols = [c for c in df.columns if any(p in c.lower() for p in ['fim', 'final', 'término', 'termino', 'última', 'ultima', 'quitação', 'finalização'])]
+    cols = [c for c in df.columns if any(p in c.lower() for p in ['fim', 'final', 'término', 'termino', 'última', 'ultima', 'quitação'])]
     if cols: return cols[-1]
     return None
 
@@ -158,8 +161,23 @@ with st.container(border=True):
             meses_botoes = ["jan.", "fev.", "mar.", "abr.", "mai.", "jun.", "jul.", "ago.", "set.", "out.", "nov.", "dez."]
             mes_selecionado = st.radio("Mês", meses_botoes, index=8, horizontal=True)
 
-# --- PROCESSAMENTO AUTOMÁTICO DE DADOS ---
-# 1. ENTRADAS
+# --- MAPEAMENTO BLINDADO DE COLUNAS DE SAÍDAS ---
+col_desc_sai = obter_coluna_por_termo(df_saidas, ['descrição do gasto', 'descrição', 'descricao'])
+col_parc_sai = obter_coluna_por_termo(df_saidas, ['parcelamento', 'parcela'])
+col_tipo_gasto_sai = obter_coluna_por_termo(df_saidas, ['tipo de gasto', 'categoria'])
+col_tipo_pag_sai = obter_coluna_por_termo(df_saidas, ['tipo de pagamento', 'pagamento', 'meio', 'forma'])
+col_val_sai = obter_coluna_valor_principal(df_saidas)
+
+if not df_saidas.empty and col_val_sai:
+    df_saidas['Valor_Clean'] = df_saidas[col_val_sai].apply(limpar_valor)
+    col_data = obter_coluna_por_termo(df_saidas, ['data'])
+    if col_data:
+        df_saidas['Dia'] = pd.to_datetime(df_saidas[col_data], format='%d/%m/%Y', errors='coerce').dt.day
+        df_saidas['Dia'] = df_saidas['Dia'].fillna(1)
+    else:
+        df_saidas['Dia'] = 1
+
+# --- PROCESSAMENTO DE ENTRADAS ---
 total_entradas_pix, total_entradas_vr = 0.0, 0.0
 entradas_salario_pix, entradas_adiantamento_pix = 0.0, 0.0
 
@@ -186,39 +204,20 @@ if entradas_salario_pix == 0: entradas_salario_pix = 2052.30
 if entradas_adiantamento_pix == 0: entradas_adiantamento_pix = 1850.00
 total_receita_conta = entradas_salario_pix + entradas_adiantamento_pix
 
-# 2. SAÍDAS E GASTOS ESSENCIAIS
+# --- PROCESSAMENTO DE SAÍDAS E ESSENCIAIS ---
 total_saidas_pix, saidas_salario_pix, saidas_adiantamento_pix = 0.0, 0.0, 0.0
 gasto_gasolina_vr, gasto_gasolina_pix = 0.0, 0.0
 gasto_lucca_vr, gasto_lucca_pix = 0.0, 0.0
 mask_parcelamentos = pd.Series(dtype=bool)
-col_desc_sai = None
-col_parc_sai = None
 
-if not df_saidas.empty:
+if not df_saidas.empty and col_tipo_pag_sai:
     try:
-        col_val_sai = obter_coluna_valor_principal(df_saidas)
-        df_saidas['Valor_Clean'] = df_saidas[col_val_sai].apply(limpar_valor)
-        
-        cols_tipo_pag = [c for c in df_saidas.columns if any(p in c.lower() for p in ['pagamento', 'meio', 'forma'])]
-        col_tipo_pag = cols_tipo_pag[0] if cols_tipo_pag else df_saidas.columns[3]
-        
-        cols_tipo_gasto = [c for c in df_saidas.columns if any(p in c.lower() for p in ['tipo de gasto', 'categoria'])]
-        col_tipo_gasto_sai = cols_tipo_gasto[0] if cols_tipo_gasto else df_saidas.columns[1]
-        
-        col_desc_sai = obter_coluna_por_termo(df_saidas, ['descrição do gasto', 'descrição', 'descricao', 'gasto', 'detalhe'])
-        col_parc_sai = obter_coluna_por_termo(df_saidas, ['parcelamento', 'parcela'])
-        
-        col_data = [c for c in df_saidas.columns if 'data' in c.lower()][0]
-        df_saidas['Dia'] = pd.to_datetime(df_saidas[col_data], format='%d/%m/%Y', errors='coerce').dt.day
-        
         txt_sai = df_saidas.astype(str).agg(' '.join, axis=1)
-        
-        mask_sai_pix = df_saidas[col_tipo_pag].astype(str).str.contains('PIX|Dinheiro|Conta|Débito', case=False, na=False) | txt_sai.str.contains('PIX', case=False, na=False)
-        mask_sai_vr = df_saidas[col_tipo_pag].astype(str).str.contains('VR|Flash|Crédito', case=False, na=False)
+        mask_sai_pix = df_saidas[col_tipo_pag_sai].astype(str).str.contains('PIX|Dinheiro|Conta|Débito', case=False, na=False) | txt_sai.str.contains('PIX', case=False, na=False)
+        mask_sai_vr = df_saidas[col_tipo_pag_sai].astype(str).str.contains('VR|Flash|Crédito', case=False, na=False)
         
         total_saidas_pix = df_saidas[mask_sai_pix]['Valor_Clean'].sum()
         
-        df_saidas['Dia'] = df_saidas['Dia'].fillna(1)
         saidas_salario_pix = df_saidas[mask_sai_pix & (df_saidas['Dia'] < 15)]['Valor_Clean'].sum()
         saidas_adiantamento_pix = df_saidas[mask_sai_pix & (df_saidas['Dia'] >= 15)]['Valor_Clean'].sum()
         
@@ -229,7 +228,8 @@ if not df_saidas.empty:
         gasto_lucca_vr = df_saidas[mask_lucca & mask_sai_vr]['Valor_Clean'].sum()
         gasto_lucca_pix = df_saidas[mask_lucca & mask_sai_pix]['Valor_Clean'].sum()
         
-        mask_parcelamentos = df_saidas[col_tipo_gasto_sai].astype(str).str.contains('parcelamento|acordo|dívida|divida', case=False, na=False)
+        if col_tipo_gasto_sai:
+            mask_parcelamentos = df_saidas[col_tipo_gasto_sai].astype(str).str.contains('parcelamento|acordo|dívida|divida', case=False, na=False)
     except: pass
 
 if df_saidas.empty or total_saidas_pix == 0:
@@ -241,10 +241,6 @@ if df_saidas.empty or total_saidas_pix == 0:
 sobra_liquida = total_entradas_pix - total_saidas_pix
 sobra_salario = entradas_salario_pix - saidas_salario_pix
 sobra_adiantamento = entradas_adiantamento_pix - saidas_adiantamento_pix
-
-# ====================================================================
-# ORDEM FIXADA DOS QUADROS
-# ====================================================================
 
 # --- 1. RESUMO EXECUTIVO GERAL ---
 with st.container(border=True):
@@ -395,12 +391,8 @@ with st.container(border=True):
             qtd_pagas = 0
             total_pago = 0.0
             
-            # Cruzamento estrito entre o "Credor" e "Descrição do Gasto"
+            # Cruzamento estrito entre o "Credor" da Dívida e "Descrição do Gasto" na aba Saídas
             if is_acordado and not df_saidas.empty and col_desc_sai:
-                df_saidas_parc = df_saidas.copy()
-                if not mask_parcelamentos.empty and mask_parcelamentos.any():
-                    df_saidas_parc = df_saidas[mask_parcelamentos].copy()
-                
                 credor_alvo = credor_nome.strip().lower()
                 
                 def bate_credor_estrito(r_sai):
@@ -408,7 +400,7 @@ with st.container(border=True):
                     if not desc_s: return False
                     return (credor_alvo == desc_s) or (credor_alvo in desc_s) or (desc_s in credor_alvo)
                 
-                df_matches = df_saidas_parc[df_saidas_parc.apply(bate_credor_estrito, axis=1)]
+                df_matches = df_saidas[df_saidas.apply(bate_credor_estrito, axis=1)]
                 
                 if not df_matches.empty:
                     total_pago = df_matches['Valor_Clean'].sum()
@@ -516,8 +508,7 @@ with st.container(border=True):
                     if not desc_s: return False
                     return (credor_alvo == desc_s) or (credor_alvo in desc_s) or (desc_s in credor_alvo)
                 
-                mask_matches = df_saidas.apply(bate_credor_estrito_fixa, axis=1)
-                df_matches = df_saidas[mask_matches]
+                df_matches = df_saidas[df_saidas.apply(bate_credor_estrito_fixa, axis=1)]
                 
                 if not df_matches.empty:
                     total_pago = df_matches['Valor_Clean'].sum()
