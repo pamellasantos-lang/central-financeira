@@ -95,7 +95,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- FUNÇÕES DE LIMPEZA E FORMATAÇÃO ---
+# --- FUNÇÕES DE LIMPEZA E SELEÇÃO DE COLUNAS ---
 def limpar_valor(val):
     if pd.isna(val): return 0.0
     if isinstance(val, (int, float)): return float(val)
@@ -145,7 +145,7 @@ df_dividas_fixas = carregar_aba(["Dividas Fixas", "Dívidas Fixas", "Parcelament
 df_entradas = carregar_aba(["Entradas", "Entradas Agosto"])
 df_saidas = carregar_aba(["Saídas", "Saidas"])
 
-# --- HEADER: ALINHADO À ESQUERDA ---
+# --- HEADER ALINHADO À ESQUERDA ---
 with st.container(border=True):
     col_titulo, col_filtros = st.columns([1.2, 2])
     with col_titulo:
@@ -205,8 +205,18 @@ if not df_saidas.empty:
         cols_tipo_gasto = [c for c in df_saidas.columns if any(p in c.lower() for p in ['tipo de gasto', 'categoria'])]
         col_tipo_gasto_sai = cols_tipo_gasto[0] if cols_tipo_gasto else df_saidas.columns[1]
         
-        col_desc_sai = obter_coluna_por_termo(df_saidas, ['descrição do gasto', 'descrição', 'descricao', 'gasto', 'detalhe'])
-        col_parc_sai = obter_coluna_por_termo(df_saidas, ['parcelamento', 'parcela'])
+        # Mapeamento rigoroso de colunas para evitar confusão entre 'Tipo de Gasto' e 'Descrição do Gasto'
+        for c in df_saidas.columns:
+            if 'descri' in c.lower():
+                col_desc_sai = c
+                break
+        if not col_desc_sai:
+            col_desc_sai = df_saidas.columns[4] if len(df_saidas.columns) > 4 else df_saidas.columns[0]
+            
+        for c in df_saidas.columns:
+            if 'parcela' in c.lower():
+                col_parc_sai = c
+                break
         
         col_data = [c for c in df_saidas.columns if 'data' in c.lower()][0]
         df_saidas['Dia'] = pd.to_datetime(df_saidas[col_data], format='%d/%m/%Y', errors='coerce').dt.day
@@ -241,10 +251,6 @@ if df_saidas.empty or total_saidas_pix == 0:
 sobra_liquida = total_entradas_pix - total_saidas_pix
 sobra_salario = entradas_salario_pix - saidas_salario_pix
 sobra_adiantamento = entradas_adiantamento_pix - saidas_adiantamento_pix
-
-# ====================================================================
-# ORDEM FIXADA DOS QUADROS
-# ====================================================================
 
 # --- 1. RESUMO EXECUTIVO GERAL ---
 with st.container(border=True):
@@ -383,7 +389,7 @@ with st.container(border=True):
             if col_acordo and pd.notna(row[col_acordo]):
                 is_acordado = str(row[col_acordo]).strip().lower() in ['sim', 's', 'true', '1', 'ativo']
             
-            # Tenta extrair o total de parcelas de "Parcelamento feito" (ex: "36x de R$ 204,41")
+            # Extração da quantidade total de parcelas
             num_parc_total = 1
             parc_feito_txt = str(row[col_parc_feito]) if col_parc_feito and pd.notna(row[col_parc_feito]) else "-"
             match_parc = re.search(r'(\d+)\s*x', parc_feito_txt, re.IGNORECASE)
@@ -396,43 +402,40 @@ with st.container(border=True):
             qtd_pagas = 0
             total_pago = 0.0
             
-            # Cruzamento exato com Saídas usando 'Credor' == 'Descrição do Gasto'
+            # Cruzamento exato e direto com Saídas
             if is_acordado and not df_saidas.empty and col_desc_sai:
-                termos_busca = [t for t in [credor_nome, nome_divida] if t and t.lower() != 'nan']
+                credor_alvo = credor_nome.strip().lower()
                 
-                def bate_desc(r_sai):
-                    desc_s = str(r_sai[col_desc_sai]).lower().strip() if col_desc_sai else ""
-                    for tb in termos_busca:
-                        tb_clean = tb.lower().replace('empréstimo', '').replace('emprestimo', '').replace('cartão', '').replace('cartao', '').strip()
-                        if tb_clean and tb_clean in desc_s: return True
-                        if tb.lower() in desc_s: return True
+                def bate_credor_exato(r_sai):
+                    desc_s = str(r_sai[col_desc_sai]).strip().lower() if col_desc_sai else ""
+                    if credor_alvo in desc_s or desc_s in credor_alvo:
+                        return True
+                    # Busca por palavras significativas (>3 letras)
+                    palavras = [w for w in credor_alvo.split() if len(w) > 3]
+                    if palavras and any(w in desc_s for w in palavras):
+                        return True
                     return False
                 
-                mask_match = df_saidas.apply(bate_desc, axis=1)
+                mask_match = df_saidas.apply(bate_credor_exato, axis=1)
                 df_matches = df_saidas[mask_match]
                 
                 if not df_matches.empty:
                     total_pago = df_matches['Valor_Clean'].sum()
+                    qtd_pagas = len(df_matches)
                     
-                    # Tenta ler "1/36" da coluna Parcelamento nas Saídas
-                    for _, r_match in df_matches.iterrows():
-                        p_str = ""
-                        if col_parc_sai and col_parc_sai in r_match and pd.notna(r_match[col_parc_sai]):
-                            p_str = str(r_match[col_parc_sai]).strip()
-                        
-                        if '/' in p_str:
-                            try:
-                                partes = p_str.split('/')
-                                p_paga = int(partes[0].strip())
-                                p_tot = int(partes[1].strip())
-                                if p_paga > qtd_pagas:
-                                    qtd_pagas = p_paga
-                                if p_tot > num_parc_total:
-                                    num_parc_total = p_tot
-                            except:
-                                qtd_pagas = max(qtd_pagas, len(df_matches))
-                        else:
-                            qtd_pagas = max(qtd_pagas, len(df_matches))
+                    # Leitura da coluna Parcelamento nas Saídas (ex: "1/36")
+                    if col_parc_sai and col_parc_sai in df_matches.columns:
+                        for p_str in df_matches[col_parc_sai].dropna().astype(str):
+                            if '/' in p_str:
+                                try:
+                                    partes = p_str.split('/')
+                                    curr_p = int(partes[0].strip())
+                                    tot_p = int(partes[1].strip())
+                                    if curr_p > 0:
+                                        qtd_pagas = max(qtd_pagas, curr_p)
+                                    if tot_p > 1:
+                                        num_parc_total = tot_p
+                                except: pass
             
             if is_acordado and num_parc_total <= 1:
                 num_parc_total = 36 # Default de contingência
@@ -442,7 +445,7 @@ with st.container(border=True):
             
             cor = "#0284C7" if is_acordado else "#FF5722"
             bg = "#E0F2FE" if is_acordado else "#FEE2E2"
-            status = "Acordo Ativo" if is_acordado else "Pendente"
+            status = "Acordado / Parcelado" if is_acordado else "Pendente"
             
             if is_acordado:
                 detalhes_blocos = f"""<div style="flex: 1; min-width: 150px; font-size:0.95rem; color:#334155;">
