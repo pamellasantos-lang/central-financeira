@@ -116,7 +116,6 @@ def obter_coluna_valor_principal(df):
     return df.columns[-1]
 
 def obter_coluna_por_termo(df, termos):
-    """Nova função inteligente que prioriza termos compostos (ex: Descrição do Gasto) antes de termos isolados (ex: Gasto)."""
     if df.empty: return None
     for t in termos:
         for c in df.columns:
@@ -126,7 +125,7 @@ def obter_coluna_por_termo(df, termos):
 
 def obter_coluna_data_fim(df):
     if df.empty: return None
-    cols = [c for c in df.columns if any(p in c.lower() for p in ['fim', 'final', 'término', 'termino', 'última', 'ultima', 'quitação'])]
+    cols = [c for c in df.columns if any(p in c.lower() for p in ['fim', 'final', 'término', 'termino', 'última', 'ultima', 'quitação', 'finalização'])]
     if cols: return cols[-1]
     return None
 
@@ -144,7 +143,7 @@ def carregar_aba(nomes_possiveis):
     return pd.DataFrame()
 
 df_dividas_atrasadas = carregar_aba(["Dividas atrasadas", "Dívidas Atrasadas", "Dividas"])
-df_dividas_fixas = carregar_aba(["Dividas Fixas", "Dívidas Fixas", "Parcelamentos Fixos", "Custos Ativos"])
+df_dividas_fixas = carregar_aba(["Custos/parcelamentos ativos", "Custos e parcelamentos ativos", "Custos Ativos", "Dividas Fixas", "Dívidas Fixas", "Parcelamentos Fixos"])
 df_entradas = carregar_aba(["Entradas", "Entradas Agosto"])
 df_saidas = carregar_aba(["Saídas", "Saidas"])
 
@@ -350,7 +349,7 @@ with st.container(border=True):
         </div>
         """, unsafe_allow_html=True)
 
-# --- 5. MAPEAMENTO DE DÍVIDAS: ATRASADAS ---
+# --- 5. MAPEAMENTO DE DÍVIDAS: ATRASADAS (TRAVADO E BLINDADO) ---
 with st.container(border=True):
     st.markdown('<div class="card-header-orange">⚠️ MAPEAMENTO DE DÍVIDAS: ATRASADAS</div>', unsafe_allow_html=True)
 
@@ -391,16 +390,16 @@ with st.container(border=True):
             qtd_pagas = 0
             total_pago = 0.0
             
-            # Cruzamento estrito entre o "Credor" da Dívida e "Descrição do Gasto" na aba Saídas
             if is_acordado and not df_saidas.empty and col_desc_sai:
                 credor_alvo = credor_nome.strip().lower()
                 
-                def bate_credor_estrito(r_sai):
-                    desc_s = str(r_sai[col_desc_sai]).strip().lower() if col_desc_sai else ""
-                    if not desc_s: return False
-                    return (credor_alvo == desc_s) or (credor_alvo in desc_s) or (desc_s in credor_alvo)
+                def match_linha_saida(row_sai):
+                    val_desc = str(row_sai[col_desc_sai]).strip().lower() if col_desc_sai else ""
+                    if not val_desc: return False
+                    return (credor_alvo == val_desc) or (credor_alvo in val_desc) or (val_desc in credor_alvo)
                 
-                df_matches = df_saidas[df_saidas.apply(bate_credor_estrito, axis=1)]
+                mask_matches = df_saidas.apply(match_linha_saida, axis=1)
+                df_matches = df_saidas[mask_matches]
                 
                 if not df_matches.empty:
                     total_pago = df_matches['Valor_Clean'].sum()
@@ -424,7 +423,7 @@ with st.container(border=True):
                         qtd_pagas = len(df_matches)
             
             if is_acordado and num_parc_total <= 1:
-                num_parc_total = 36 # Default
+                num_parc_total = 36
             
             saldo_restante = max(0.0, val_total - total_pago)
             faltam_pagar = max(0, num_parc_total - qtd_pagas)
@@ -464,79 +463,46 @@ Aguardando acordo / negociação para este credor.
         st.info("Aba 'Dívidas atrasadas' não encontrada ou vazia.")
 
 
-# --- 6. CUSTOS E PARCELAMENTOS ATIVOS ---
+# --- 6. CUSTOS E PARCELAMENTOS ATIVOS (AJUSTE EXCLUSIVO SOLICITADO) ---
 with st.container(border=True):
     st.markdown('<div class="card-header-navy">✅ CUSTOS / PARCELAMENTOS ATIVOS (POR JANELA)</div>', unsafe_allow_html=True)
 
     if not df_dividas_fixas.empty:
-        col_nome_fixa = obter_coluna_por_termo(df_dividas_fixas, ['descrição', 'descricao', 'credor', 'nome'])
-        col_val_fixa = obter_coluna_valor_principal(df_dividas_fixas)
-        col_parc_fixa = obter_coluna_por_termo(df_dividas_fixas, ['possui parcelamento', 'tem parcelamento', 'parcelamento'])
-        col_num_parc_fixa = obter_coluna_por_termo(df_dividas_fixas, ['quantidade', 'parcelas', 'num', 'nº'])
-        col_inicio_fixa = obter_coluna_por_termo(df_dividas_fixas, ['inicio', 'início'])
-        col_fim_fixa = obter_coluna_data_fim(df_dividas_fixas)
+        col_nome_fixa = obter_coluna_por_termo(df_dividas_fixas, ['nome da dívida', 'nome da divida', 'nome', 'descrição', 'descricao', 'credor'])
+        col_val_fixa = obter_coluna_por_termo(df_dividas_fixas, ['valor (r$)', 'valor']) or obter_coluna_valor_principal(df_dividas_fixas)
+        col_parc_fixa = obter_coluna_por_termo(df_dividas_fixas, ['tem parcelamento?', 'tem parcelamento', 'possui parcelamento', 'parcelamento'])
+        col_num_parc_fixa = obter_coluna_por_termo(df_dividas_fixas, ['quantidade de parcelas', 'quantidade', 'parcelas', 'num', 'nº'])
+        col_inicio_fixa = obter_coluna_por_termo(df_dividas_fixas, ['inicio do pagamento', 'início do pagamento', 'inicio', 'início'])
+        col_fim_fixa = obter_coluna_por_termo(df_dividas_fixas, ['finaliza em', 'finaliza', 'fim', 'término', 'termino'])
         col_janela_fixa = obter_coluna_por_termo(df_dividas_fixas, ['janela'])
         
         itens_salario = []
         itens_adiantamento = []
         
         for idx, row in df_dividas_fixas.iterrows():
-            desc = str(row[col_nome_fixa]).strip() if col_nome_fixa else "Desconhecido"
-            if not desc or desc == 'nan': continue
+            nome_div = str(row[col_nome_fixa]).strip() if col_nome_fixa and pd.notna(row[col_nome_fixa]) else "Desconhecido"
+            if not nome_div or nome_div.lower() == 'nan': continue
             
-            val_parcela = limpar_valor(row[col_val_fixa])
-            janela = str(row[col_janela_fixa]).lower() if col_janela_fixa else ""
+            val_div = limpar_valor(row[col_val_fixa]) if col_val_fixa and pd.notna(row[col_val_fixa]) else 0.0
+            janela = str(row[col_janela_fixa]).lower().strip() if col_janela_fixa and pd.notna(row[col_janela_fixa]) else ""
             
             is_parcelado = False
-            if col_parc_fixa:
+            if col_parc_fixa and pd.notna(row[col_parc_fixa]):
                 is_parcelado = str(row[col_parc_fixa]).strip().lower() in ['sim', 's', 'true', '1']
             
-            num_parc_total = 1
-            if col_num_parc_fixa and pd.notna(row[col_num_parc_fixa]):
-                val_str = str(row[col_num_parc_fixa])
-                match_p = re.search(r'(\d+)', val_str)
-                if match_p:
-                    num_parc_total = int(match_p.group(1))
-            
-            qtd_pagas, total_pago = 0, 0.0
-            
-            if is_parcelado and not df_saidas.empty and col_desc_sai:
-                credor_alvo = desc.strip().lower()
-                
-                def bate_credor_estrito_fixa(r_sai):
-                    desc_s = str(r_sai[col_desc_sai]).strip().lower() if col_desc_sai else ""
-                    if not desc_s: return False
-                    return (credor_alvo == desc_s) or (credor_alvo in desc_s) or (desc_s in credor_alvo)
-                
-                df_matches = df_saidas[df_saidas.apply(bate_credor_estrito_fixa, axis=1)]
-                
-                if not df_matches.empty:
-                    total_pago = df_matches['Valor_Clean'].sum()
-                    
-                    for _, r_match in df_matches.iterrows():
-                        p_str = str(r_match[col_parc_sai]).strip() if col_parc_sai and pd.notna(r_match[col_parc_sai]) else ""
-                        if '/' in p_str:
-                            try:
-                                partes = p_str.split('/')
-                                curr_p = int(partes[0].strip())
-                                if curr_p > 0:
-                                    qtd_pagas = max(qtd_pagas, curr_p)
-                            except: pass
-                    if qtd_pagas == 0:
-                        qtd_pagas = len(df_matches)
-            
-            data_inicio = str(row[col_inicio_fixa]) if col_inicio_fixa and pd.notna(row[col_inicio_fixa]) else "-"
-            data_fim = str(row[col_fim_fixa]) if col_fim_fixa and pd.notna(row[col_fim_fixa]) else "-"
+            qtd_parc_str = str(row[col_num_parc_fixa]).strip() if col_num_parc_fixa and pd.notna(row[col_num_parc_fixa]) else "-"
+            data_inicio = str(row[col_inicio_fixa]).strip() if col_inicio_fixa and pd.notna(row[col_inicio_fixa]) else "-"
+            data_fim = str(row[col_fim_fixa]).strip() if col_fim_fixa and pd.notna(row[col_fim_fixa]) else "-"
             
             if is_parcelado:
-                info_parc_html = f"• <b>Total de Parcelas:</b> {num_parc_total}x<br>• <b>Início do Pagamento:</b> {data_inicio}<br>• <b>Finaliza em:</b> {data_fim}<br>• <b>Progresso:</b> <span style='color:#10B981; font-weight:700;'>{qtd_pagas} de {num_parc_total} paga(s)</span>"
+                info_parc_html = f"• <b>Quantidade de Parcelas:</b> {qtd_parc_str}<br>• <b>Início do Pagamento:</b> {data_inicio}<br>• <b>Finaliza em:</b> {data_fim}"
             else:
                 info_parc_html = "• <b>Custo Fixo Contínuo</b> (Sem data final)"
                 
             html_item = f"""<div style="background:#F8FAFC; padding:16px; border-radius:8px; border:1px solid #CBD5E1; margin-bottom:10px;">
-<div style="font-weight:800; font-size:1.1rem; color:#0F172A; margin-bottom:4px;">{desc}</div>
+<div style="font-weight:800; font-size:1.1rem; color:#0F172A; margin-bottom:4px;">{nome_div}</div>
 <div style="font-size:0.95rem; color:#334155;">
-• <b>Valor a Pagar (Mês):</b> <span style="color:#0F172A; font-weight:700;">{fmt_brl(val_parcela)}</span><br>
+• <b>Valor (R$):</b> <span style="color:#0F172A; font-weight:700;">{fmt_brl(val_div)}</span><br>
 {info_parc_html}
 </div></div>"""
             
@@ -560,7 +526,7 @@ with st.container(border=True):
             else:
                 st.write("Sem registros para esta janela.")
     else:
-        st.info("Aba 'Dívidas Fixas' não encontrada ou vazia.")
+        st.info("Aba 'Custos/parcelamentos ativos' não encontrada ou vazia.")
 
 
 # --- 7. DISTRIBUIÇÃO VISUAL DE GASTOS POR TIPO DE SAÍDA (TREEMAP) ---
