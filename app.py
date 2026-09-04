@@ -226,7 +226,6 @@ if not df_saidas.empty:
         gasto_lucca_vr = df_saidas[mask_lucca & mask_sai_vr]['Valor_Clean'].sum()
         gasto_lucca_pix = df_saidas[mask_lucca & mask_sai_pix]['Valor_Clean'].sum()
         
-        # Filtro EXATO para identificação de parcelamentos na lógica das dívidas
         mask_parcelamentos = df_saidas[col_tipo_gasto_sai].astype(str).str.contains('parcelamento', case=False, na=False)
     except: pass
 
@@ -239,11 +238,6 @@ if df_saidas.empty or total_saidas_pix == 0:
 sobra_liquida = total_entradas_pix - total_saidas_pix
 sobra_salario = entradas_salario_pix - saidas_salario_pix
 sobra_adiantamento = entradas_adiantamento_pix - saidas_adiantamento_pix
-
-
-# ====================================================================
-# ORDEM DOS QUADROS ESTRITAMENTE FIXADA E SEPARADA
-# ====================================================================
 
 # --- 1. RESUMO EXECUTIVO GERAL ---
 with st.container(border=True):
@@ -299,7 +293,7 @@ with st.container(border=True):
                 <span style="background:#FF5722; color:white; padding:4px 12px; border-radius:12px; font-weight:700; font-size:0.85rem;">{pct_gas:.1f}% Usado</span>
             </div>
             <div style="background-color:#E2E8F0; border-radius:8px; height:10px; width:100%; overflow:hidden; margin-bottom:12px;">
-                <div style="background-color:#FF5722; width:{pct_gas:.1f}%; height:100%; border-radius:8px;"></div>
+                <div style="background-color:#FF5722; width:{pct_gas:.1f}%; height:100%;"></div>
             </div>
             <div style="font-size:0.95rem; color:#334155; line-height:1.6;">
                 • <b>Saiu do VR (Flash):</b> <span style="color:#0284C7; font-weight:700;">{fmt_brl(gasto_gasolina_vr)}</span><br>
@@ -317,7 +311,7 @@ with st.container(border=True):
                 <span style="background:#0284C7; color:white; padding:4px 12px; border-radius:12px; font-weight:700; font-size:0.85rem;">{pct_lucca:.1f}% Usado</span>
             </div>
             <div style="background-color:#E2E8F0; border-radius:8px; height:10px; width:100%; overflow:hidden; margin-bottom:12px;">
-                <div style="background-color:#0284C7; width:{pct_lucca:.1f}%; height:100%; border-radius:8px;"></div>
+                <div style="background-color:#0284C7; width:{pct_lucca:.1f}%; height:100%;"></div>
             </div>
             <div style="font-size:0.95rem; color:#334155; line-height:1.6;">
                 • <b>Saiu do VR (Flash):</b> <span style="color:#0284C7; font-weight:700;">{fmt_brl(gasto_lucca_vr)}</span><br>
@@ -342,10 +336,10 @@ with st.container(border=True):
     with col_rec_box:
         st.markdown(f"""
         <div style="background:#F8FAFC; padding:18px; border-radius:8px; border:1px solid #CBD5E1;">
-            <div style="font-size:0.9rem; font-weight:bold; color:#0F172A; margin-bottom:4px;">📅 Janela Salário (Dia 05)</div>
+            <div style="font-size:0.9rem; font-weight:bold; color:#0F172A; margin-bottom:4px;">📅 Janela Salário (04/09)</div>
             <div style="font-size:1.3rem; font-weight:800; color:#10B981;">{fmt_brl(entradas_salario_pix)}</div>
             <hr style="margin:8px 0; border:0.5px solid #CBD5E1;">
-            <div style="font-size:0.9rem; font-weight:bold; color:#0F172A; margin-bottom:4px;">📅 Janela Adiantamento (Dia 15)</div>
+            <div style="font-size:0.9rem; font-weight:bold; color:#0F172A; margin-bottom:4px;">📅 Janela Adiantamento (15/09)</div>
             <div style="font-size:1.3rem; font-weight:800; color:#0284C7;">{fmt_brl(entradas_adiantamento_pix)}</div>
             <hr style="margin:8px 0; border:0.5px solid #CBD5E1;">
             <div style="font-size:0.95rem; font-weight:bold; color:#0F172A; margin-bottom:4px;">💰 Total Operacional em Conta</div>
@@ -375,12 +369,9 @@ with st.container(border=True):
                 is_acordado = str(row[col_acordo]).strip().lower() == 'sim'
             
             qtd_pagas, total_pago = 0, 0.0
-            
-            # Cruzamento com aba saídas (SE Acordado = Sim E Saída = Parcelamento)
             if is_acordado and not df_saidas.empty and not mask_parcelamentos.empty and col_desc_sai:
                 df_saidas_parc = df_saidas[mask_parcelamentos]
-                # Busca pelo nome exato do credor na descrição da saída
-                mask_match = df_saidas_parc[col_desc_sai].astype(str).str.contains(credor, case=False, na=False)
+                mask_match = df_saidas_parc[col_desc_sai].astype(str).str.contains(credor.split()[0], case=False, na=False)
                 qtd_pagas = mask_match.sum()
                 total_pago = df_saidas_parc[mask_match]['Valor_Clean'].sum()
             
@@ -389,7 +380,7 @@ with st.container(border=True):
                 v = limpar_valor(row[col_num_parc])
                 if v > 0: num_parc_total = int(v)
             if is_acordado and num_parc_total <= 1:
-                num_parc_total = 36 # Default
+                num_parc_total = 36
             
             saldo_restante = max(0.0, val_total - total_pago)
             faltam_pagar = max(0, num_parc_total - qtd_pagas)
@@ -398,36 +389,31 @@ with st.container(border=True):
             bg = "#E0F2FE" if is_acordado else "#FEE2E2"
             status = "Acordado / Parcelado" if is_acordado else "Pendente"
             
-            html_atr = f"""
-            <div style="background:#F8FAFC; padding:18px; border-radius:8px; border:1px solid #CBD5E1; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
-                <div style="flex: 1; min-width: 250px;">
-                    <span style="font-weight:800; font-size:1.1rem; color:#0F172A;">{credor}</span><br>
-                    <span style="background:{bg}; color:{cor}; border:1px solid {cor}; padding:2px 8px; border-radius:12px; font-weight:700; font-size:0.75rem;">{status}</span>
-                </div>
-                <div style="flex: 1; min-width: 150px; font-size:0.95rem; color:#334155;">
-                    <b>Valor Total:</b> <span style="color:#0F172A; font-weight:700;">{fmt_brl(val_total)}</span>
-                </div>
-            """
-            
             if is_acordado:
-                html_atr += f"""
-                <div style="flex: 1; min-width: 150px; font-size:0.95rem; color:#334155;">
-                    <b>Já pago:</b> {qtd_pagas} parcela(s)<br>
-                    <span style="color:#10B981; font-weight:700;">{fmt_brl(total_pago)}</span>
-                </div>
-                <div style="flex: 1; min-width: 150px; font-size:0.95rem; color:#334155;">
-                    <b>Falta pagar:</b> {faltam_pagar} parcela(s)<br>
-                    <span style="color:#FF5722; font-weight:700;">{fmt_brl(saldo_restante)}</span>
-                </div>
-                """
+                detalhes_blocos = f"""<div style="flex: 1; min-width: 150px; font-size:0.95rem; color:#334155;">
+<b>Já pago:</b> {qtd_pagas} parcela(s)<br>
+<span style="color:#10B981; font-weight:700;">{fmt_brl(total_pago)}</span>
+</div>
+<div style="flex: 1; min-width: 150px; font-size:0.95rem; color:#334155;">
+<b>Falta pagar:</b> {faltam_pagar} parcela(s)<br>
+<span style="color:#FF5722; font-weight:700;">{fmt_brl(saldo_restante)}</span>
+</div>"""
             else:
-                html_atr += f"""
-                <div style="flex: 2; min-width: 300px; font-size:0.95rem; color:#FF5722; font-weight:600;">
-                    Aguardando acordo / negociação para este credor.
-                </div>
-                """
-            html_atr += "</div>"
-            st.markdown(html_atr, unsafe_allow_html=True)
+                detalhes_blocos = """<div style="flex: 2; min-width: 300px; font-size:0.95rem; color:#FF5722; font-weight:600;">
+Aguardando acordo / negociação para este credor.
+</div>"""
+            
+            html_card_atr = f"""<div style="background:#F8FAFC; padding:18px; border-radius:8px; border:1px solid #CBD5E1; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+<div style="flex: 1; min-width: 250px;">
+<span style="font-weight:800; font-size:1.1rem; color:#0F172A;">{credor}</span><br>
+<span style="background:{bg}; color:{cor}; border:1px solid {cor}; padding:2px 8px; border-radius:12px; font-weight:700; font-size:0.75rem;">{status}</span>
+</div>
+<div style="flex: 1; min-width: 150px; font-size:0.95rem; color:#334155;">
+<b>Valor Total:</b> <span style="color:#0F172A; font-weight:700;">{fmt_brl(val_total)}</span>
+</div>
+{detalhes_blocos}
+</div>"""
+            st.markdown(html_card_atr, unsafe_allow_html=True)
     else:
         st.info("Aba 'Dívidas atrasadas' não encontrada ou vazia.")
 
@@ -461,35 +447,28 @@ with st.container(border=True):
             qtd_pagas, total_pago = 0, 0.0
             if is_parcelado and not df_saidas.empty and not mask_parcelamentos.empty and col_desc_sai:
                 df_saidas_parc = df_saidas[mask_parcelamentos]
-                mask_match = df_saidas_parc[col_desc_sai].astype(str).str.contains(desc, case=False, na=False)
+                mask_match = df_saidas_parc[col_desc_sai].astype(str).str.contains(desc.split()[0], case=False, na=False)
                 qtd_pagas = mask_match.sum()
                 total_pago = df_saidas_parc[mask_match]['Valor_Clean'].sum()
             
             data_inicio = str(row[col_inicio_fixa]) if col_inicio_fixa and pd.notna(row[col_inicio_fixa]) else "-"
             data_fim = str(row[col_fim_fixa]) if col_fim_fixa and pd.notna(row[col_fim_fixa]) else "-"
             
-            # HTML Build
-            html_item = f"""
-            <div style="background:#F8FAFC; padding:16px; border-radius:8px; border:1px solid #CBD5E1; margin-bottom:10px;">
-                <div style="font-weight:800; font-size:1.1rem; color:#0F172A; margin-bottom:4px;">{desc}</div>
-                <div style="font-size:0.95rem; color:#334155;">
-                    • <b>Valor a Pagar (Mês):</b> <span style="color:#0F172A; font-weight:700;">{fmt_brl(val_parcela)}</span><br>
-            """
             if is_parcelado:
-                html_item += f"""
-                    • <b>Início do Pagamento:</b> {data_inicio} (1ª parcela)<br>
-                    • <b>Finaliza em:</b> {data_fim}<br>
-                    • <b>Parcelas Confirmadas no Mês:</b> <span style="color:#10B981; font-weight:700;">{qtd_pagas} paga(s)</span>
-                """
+                info_parc_html = f"• <b>Início do Pagamento:</b> {data_inicio} (1ª parcela)<br>• <b>Finaliza em:</b> {data_fim}<br>• <b>Parcelas Confirmadas no Mês:</b> <span style='color:#10B981; font-weight:700;'>{qtd_pagas} paga(s)</span>"
             else:
-                html_item += "• <b>Custo Fixo Contínuo</b> (Sem data final)"
+                info_parc_html = "• <b>Custo Fixo Contínuo</b> (Sem data final)"
                 
-            html_item += "</div></div>"
+            html_item = f"""<div style="background:#F8FAFC; padding:16px; border-radius:8px; border:1px solid #CBD5E1; margin-bottom:10px;">
+<div style="font-weight:800; font-size:1.1rem; color:#0F172A; margin-bottom:4px;">{desc}</div>
+<div style="font-size:0.95rem; color:#334155;">
+• <b>Valor a Pagar (Mês):</b> <span style="color:#0F172A; font-weight:700;">{fmt_brl(val_parcela)}</span><br>
+{info_parc_html}
+</div></div>"""
             
             if 'salário' in janela or 'salario' in janela or '05' in janela:
                 itens_salario.append(html_item)
             else:
-                # Default vai para Adiantamento se não for salário
                 itens_adiantamento.append(html_item)
                 
         c_fix1, c_fix2 = st.columns(2)
