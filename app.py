@@ -205,18 +205,8 @@ if not df_saidas.empty:
         cols_tipo_gasto = [c for c in df_saidas.columns if any(p in c.lower() for p in ['tipo de gasto', 'categoria'])]
         col_tipo_gasto_sai = cols_tipo_gasto[0] if cols_tipo_gasto else df_saidas.columns[1]
         
-        # Mapeamento rigoroso de colunas para evitar confusão entre 'Tipo de Gasto' e 'Descrição do Gasto'
-        for c in df_saidas.columns:
-            if 'descri' in c.lower():
-                col_desc_sai = c
-                break
-        if not col_desc_sai:
-            col_desc_sai = df_saidas.columns[4] if len(df_saidas.columns) > 4 else df_saidas.columns[0]
-            
-        for c in df_saidas.columns:
-            if 'parcela' in c.lower():
-                col_parc_sai = c
-                break
+        col_desc_sai = obter_coluna_por_termo(df_saidas, ['descrição do gasto', 'descrição', 'descricao', 'gasto', 'detalhe'])
+        col_parc_sai = obter_coluna_por_termo(df_saidas, ['parcelamento', 'parcela'])
         
         col_data = [c for c in df_saidas.columns if 'data' in c.lower()][0]
         df_saidas['Dia'] = pd.to_datetime(df_saidas[col_data], format='%d/%m/%Y', errors='coerce').dt.day
@@ -239,7 +229,8 @@ if not df_saidas.empty:
         gasto_lucca_vr = df_saidas[mask_lucca & mask_sai_vr]['Valor_Clean'].sum()
         gasto_lucca_pix = df_saidas[mask_lucca & mask_sai_pix]['Valor_Clean'].sum()
         
-        mask_parcelamentos = df_saidas[col_tipo_gasto_sai].astype(str).str.contains('parcelamento|acordo|dívida|divida', case=False, na=False)
+        # Filtro estrito para considerar apenas pagamentos da categoria Parcelamentos
+        mask_parcelamentos = df_saidas[col_tipo_gasto_sai].astype(str).str.contains('parcelamento', case=False, na=False)
     except: pass
 
 if df_saidas.empty or total_saidas_pix == 0:
@@ -402,40 +393,45 @@ with st.container(border=True):
             qtd_pagas = 0
             total_pago = 0.0
             
-            # Cruzamento exato e direto com Saídas
+            # Cruzamento estrito: Filtra Saídas onde a Descrição do Gasto corresponde ao Credor
             if is_acordado and not df_saidas.empty and col_desc_sai:
+                # Filtra apenas linhas de Saídas onde Tipo de Gasto é Parcelamentos ou tem fração '/'
+                df_saidas_parc = df_saidas.copy()
+                if not mask_parcelamentos.empty and mask_parcelamentos.any():
+                    df_saidas_parc = df_saidas[mask_parcelamentos].copy()
+                
                 credor_alvo = credor_nome.strip().lower()
                 
-                def bate_credor_exato(r_sai):
+                def bate_credor_estrito(r_sai):
                     desc_s = str(r_sai[col_desc_sai]).strip().lower() if col_desc_sai else ""
-                    if credor_alvo in desc_s or desc_s in credor_alvo:
-                        return True
-                    # Busca por palavras significativas (>3 letras)
-                    palavras = [w for w in credor_alvo.split() if len(w) > 3]
-                    if palavras and any(w in desc_s for w in palavras):
-                        return True
-                    return False
+                    if not desc_s: return False
+                    return (credor_alvo == desc_s) or (credor_alvo in desc_s) or (desc_s in credor_alvo)
                 
-                mask_match = df_saidas.apply(bate_credor_exato, axis=1)
-                df_matches = df_saidas[mask_match]
+                df_matches = df_saidas_parc[df_saidas_parc.apply(bate_credor_estrito, axis=1)]
                 
                 if not df_matches.empty:
                     total_pago = df_matches['Valor_Clean'].sum()
-                    qtd_pagas = len(df_matches)
+                    qtd_pagas = 0
                     
-                    # Leitura da coluna Parcelamento nas Saídas (ex: "1/36")
-                    if col_parc_sai and col_parc_sai in df_matches.columns:
-                        for p_str in df_matches[col_parc_sai].dropna().astype(str):
-                            if '/' in p_str:
-                                try:
-                                    partes = p_str.split('/')
-                                    curr_p = int(partes[0].strip())
-                                    tot_p = int(partes[1].strip())
-                                    if curr_p > 0:
-                                        qtd_pagas = max(qtd_pagas, curr_p)
-                                    if tot_p > 1:
-                                        num_parc_total = tot_p
-                                except: pass
+                    # Tenta extrair o número exato da parcela atual na coluna "Parcelamento" (ex: "1/36")
+                    for _, r_match in df_matches.iterrows():
+                        p_str = ""
+                        if col_parc_sai and col_parc_sai in r_match and pd.notna(r_match[col_parc_sai]):
+                            p_str = str(r_match[col_parc_sai]).strip()
+                        
+                        if '/' in p_str:
+                            try:
+                                partes = p_str.split('/')
+                                curr_p = int(partes[0].strip())
+                                tot_p = int(partes[1].strip())
+                                if curr_p > 0:
+                                    qtd_pagas = max(qtd_pagas, curr_p)
+                                if tot_p > 1:
+                                    num_parc_total = tot_p
+                            except: pass
+                    
+                    if qtd_pagas == 0:
+                        qtd_pagas = len(df_matches)
             
             if is_acordado and num_parc_total <= 1:
                 num_parc_total = 36 # Default de contingência
