@@ -26,7 +26,7 @@ st.markdown("""
     [data-testid="collapsedControl"] {display: none;}
     section[data-testid="stSidebar"] {display: none;}
     
-    /* Customização dos Containers Nativos em Caixas Fechadas */
+    /* Customização dos Containers Nativos (Caixas/Cards fechadas) */
     [data-testid="stVerticalBlockBorderWrapper"] {
         background-color: #FFFFFF !important;
         border-radius: 10px !important;
@@ -37,7 +37,7 @@ st.markdown("""
         margin-bottom: 15px !important;
     }
     
-    /* Preenchimento interno das caixas */
+    /* Preenchimento interno do container */
     [data-testid="stVerticalBlockBorderWrapper"] > div {
         padding: 14px 18px !important;
     }
@@ -80,7 +80,7 @@ st.markdown("""
     .kpi-value-main { font-size: 1.6rem; font-weight: 800; color: #0F172A; }
     .kpi-subtext { font-size: 0.8rem; font-weight: 600; color: #64748B; margin-top: 2px; }
     
-    /* Estilização das caixinhas de mês (Radio horizontal) */
+    /* Estilização para as caixinhas de mês (Radio horizontal) */
     div.row-widget.stRadio > div { flex-direction: row; flex-wrap: wrap; gap: 8px; }
     div.row-widget.stRadio > div > label { 
         background-color: #FFFFFF; border: 1px solid #CBD5E1; 
@@ -176,7 +176,6 @@ if not df_entradas.empty:
     except Exception:
         pass
 
-# Fallbacks de cálculo para contingência
 if total_entradas_pix == 0: total_entradas_pix = 3902.30
 if total_entradas_vr == 0: total_entradas_vr = 682.50
 if entradas_salario_pix == 0: entradas_salario_pix = 2052.30
@@ -228,40 +227,58 @@ with c2:
 with c3:
     st.markdown(f'<div class="kpi-card-box kpi-card-orange"><div class="kpi-title">Total Saídas PIX</div><div class="kpi-value-main" style="color:#FF5722;">{fmt_brl(total_saidas_pix)}</div><div class="kpi-subtext">Todos os gastos em conta</div></div>', unsafe_allow_html=True)
 with c4:
-    st.markdown(f'<div class="kpi-card-box kpi-card-green"><div class="kpi-title">Sobra</div><div class="kpi-value-main" style="color:#10B981;">{fmt_brl(sobra_liquida)}</div><div class="kpi-subtext">Entradas PIX - Saídas PIX</div></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="kpi-card-box kpi-card-green"><div class="kpi-title">Sobra Líquida</div><div class="kpi-value-main" style="color:#10B981;">{fmt_brl(sobra_liquida)}</div><div class="kpi-subtext">Entradas PIX - Saídas PIX</div></div>', unsafe_allow_html=True)
 
 st.markdown("<div style='margin-bottom:15px;'></div>", unsafe_allow_html=True)
 
-# --- 2. QUADRO ESSENCIAIS MENSAIS ---
-meta_gasolina = 400.00
-gasto_gas_tot = gasto_gasolina_vr + gasto_gasolina_pix
-pct_gas = min(100.0, (gasto_gas_tot / meta_gasolina) * 100) if meta_gasolina > 0 else 0
-resta_gas = max(0.0, meta_gasolina - gasto_gas_tot)
+# --- 2. CAIXINHA DE ESSENCIAIS MENSAIS ---
+caixinha_gasolina = 400.00
+caixinha_lucca = 480.00
+caixinha_total = caixinha_gasolina + caixinha_lucca # 880.00
 
-meta_lucca = 480.00
+# Distribuição inteligente (Baseado no peso das contas de cada quinzena)
+caixa_salario = 680.00 # Guarda a maior parte no dia 04
+caixa_adiantamento = 200.00 # Guarda o resto no dia 15 (devido à parcela pesada do carro)
+
+gasto_gas_tot = gasto_gasolina_vr + gasto_gasolina_pix
+pct_gas = min(100.0, (gasto_gas_tot / caixinha_gasolina) * 100) if caixinha_gasolina > 0 else 0
+
 gasto_lucca_tot = gasto_lucca_vr + gasto_lucca_pix
-pct_lucca = min(100.0, (gasto_lucca_tot / meta_lucca) * 100) if meta_lucca > 0 else 0
-resta_lucca = max(0.0, meta_lucca - gasto_lucca_tot)
+pct_lucca = min(100.0, (gasto_lucca_tot / caixinha_lucca) * 100) if caixinha_lucca > 0 else 0
 
 with st.container(border=True):
-    st.markdown('<div class="card-header-orange">👶 ESSENCIAIS MENSAIS (LUCCA & GASOLINA)</div>', unsafe_allow_html=True)
+    st.markdown('<div class="card-header-orange">📦 CAIXINHA DE ESSENCIAIS (RESERVA OBRIGATÓRIA MENSAL)</div>', unsafe_allow_html=True)
+    
+    st.markdown(f"""
+    <div style="background:#0F172A; color:white; padding:12px 18px; border-radius:8px; margin-bottom:15px; display:flex; justify-content:space-between; align-items:center;">
+        <div>
+            <span style="font-size:0.9rem; font-weight:600; color:#CBD5E1;">Valor Total da Caixinha no Mês:</span><br>
+            <span style="font-size:1.4rem; font-weight:800; color:#10B981;">{fmt_brl(caixinha_total)}</span>
+        </div>
+        <div style="text-align:right; border-left:1px solid #334155; padding-left:15px;">
+            <span style="font-size:0.85rem; font-weight:600; color:#94A3B8;">Distribuição de Reserva:</span><br>
+            <span style="font-size:1rem; font-weight:700;">📅 Janela Salário: <span style="color:#FF5722;">{fmt_brl(caixa_salario)}</span></span><br>
+            <span style="font-size:1rem; font-weight:700;">📅 Janela Adiantamento: <span style="color:#FF5722;">{fmt_brl(caixa_adiantamento)}</span></span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
     col_ess1, col_ess2 = st.columns(2)
 
     with col_ess1:
         st.markdown(f"""
         <div style="background:#F8FAFC; padding:16px; border-radius:8px; border:1px solid #E2E8F0;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                <span style="font-weight:700; font-size:1.05rem; color:#0F172A;">🚗 Gasolina (Meta: {fmt_brl(meta_gasolina)})</span>
+                <span style="font-weight:700; font-size:1.05rem; color:#0F172A;">🚗 Gasolina: {fmt_brl(caixinha_gasolina)}</span>
                 <span style="background:#FF5722; color:white; padding:4px 12px; border-radius:12px; font-weight:700; font-size:0.85rem;">{pct_gas:.1f}% Usado</span>
             </div>
             <div style="background-color:#E2E8F0; border-radius:8px; height:10px; width:100%; overflow:hidden; margin-bottom:12px;">
                 <div style="background-color:#FF5722; width:{pct_gas:.1f}%; height:100%; border-radius:8px;"></div>
             </div>
             <div style="font-size:0.95rem; color:#334155; line-height:1.6;">
-                • <b>Gasto em VR (Flash):</b> <span style="color:#0284C7; font-weight:700;">{fmt_brl(gasto_gasolina_vr)}</span><br>
-                • <b>Gasto em PIX (Conta):</b> <span style="color:#FF5722; font-weight:700;">{fmt_brl(gasto_gasolina_pix)}</span><br>
-                • <b>Total Gastando:</b> <b>{fmt_brl(gasto_gas_tot)}</b><br>
-                • <b>Resta disponível:</b> <span style="color:#10B981; font-weight:700;">{fmt_brl(resta_gas)}</span>
+                • <b>Saiu do VR (Flash):</b> <span style="color:#0284C7; font-weight:700;">{fmt_brl(gasto_gasolina_vr)}</span><br>
+                • <b>Saiu do PIX (Conta):</b> <span style="color:#FF5722; font-weight:700;">{fmt_brl(gasto_gasolina_pix)}</span><br>
+                • <b>Saldo Restante na Caixinha:</b> <span style="color:#10B981; font-weight:700;">{fmt_brl(max(0, caixinha_gasolina - gasto_gas_tot))}</span>
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -270,17 +287,16 @@ with st.container(border=True):
         st.markdown(f"""
         <div style="background:#F8FAFC; padding:16px; border-radius:8px; border:1px solid #E2E8F0;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                <span style="font-weight:700; font-size:1.05rem; color:#0F172A;">👶 Lucca (Fralda/Leite) (Meta: {fmt_brl(meta_lucca)})</span>
+                <span style="font-weight:700; font-size:1.05rem; color:#0F172A;">👶 Lucca (Fralda/Leite): {fmt_brl(caixinha_lucca)}</span>
                 <span style="background:#0284C7; color:white; padding:4px 12px; border-radius:12px; font-weight:700; font-size:0.85rem;">{pct_lucca:.1f}% Usado</span>
             </div>
             <div style="background-color:#E2E8F0; border-radius:8px; height:10px; width:100%; overflow:hidden; margin-bottom:12px;">
                 <div style="background-color:#0284C7; width:{pct_lucca:.1f}%; height:100%; border-radius:8px;"></div>
             </div>
             <div style="font-size:0.95rem; color:#334155; line-height:1.6;">
-                • <b>Gasto em VR (Flash):</b> <span style="color:#0284C7; font-weight:700;">{fmt_brl(gasto_lucca_vr)}</span><br>
-                • <b>Gasto em PIX (Conta):</b> <span style="color:#FF5722; font-weight:700;">{fmt_brl(gasto_lucca_pix)}</span><br>
-                • <b>Total Gastando:</b> <b>{fmt_brl(gasto_lucca_tot)}</b><br>
-                • <b>Resta disponível:</b> <span style="color:#10B981; font-weight:700;">{fmt_brl(resta_lucca)}</span>
+                • <b>Saiu do VR (Flash):</b> <span style="color:#0284C7; font-weight:700;">{fmt_brl(gasto_lucca_vr)}</span><br>
+                • <b>Saiu do PIX (Conta):</b> <span style="color:#FF5722; font-weight:700;">{fmt_brl(gasto_lucca_pix)}</span><br>
+                • <b>Saldo Restante na Caixinha:</b> <span style="color:#10B981; font-weight:700;">{fmt_brl(max(0, caixinha_lucca - gasto_lucca_tot))}</span>
             </div>
         </div>
         """, unsafe_allow_html=True)
