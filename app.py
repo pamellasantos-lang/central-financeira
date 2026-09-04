@@ -91,6 +91,10 @@ st.markdown("""
     .kpi-card-green { border-left-color: #10B981; }
     .kpi-card-blue { border-left-color: #0284C7; }
 
+    .kpi-title { font-size: 0.85rem; font-weight: 700; color: #64748B; text-transform: uppercase; margin-bottom: 6px; }
+    .kpi-value-main { font-size: 1.8rem !important; font-weight: 800 !important; line-height: 1.2 !important; }
+    .kpi-subtext { font-size: 0.85rem; font-weight: 600; color: #64748B; margin-top: 4px; }
+    
     /* AVATAR EXPANDIDO E CENTRALIZADO */
     .avatar-frame {
         width: 140px;
@@ -142,26 +146,27 @@ st.markdown("""
         border-right: 11px solid #CBD5E1;
     }
     
-    /* BOTÕES DE MÊS COMPACTOS E IMPEDIDOS DE QUEBRAR TEXTO */
+    /* BOTÕES DE MÊS COMPACTOS - AJUSTADOS PARA NÃO SOBREPOR DEZEMBRO */
     div[data-testid="stRadio"] > div { 
-        flex-direction: row; 
-        flex-wrap: nowrap; 
-        gap: 4px; 
-        justify-content: flex-start; 
-        align-items: center;
+        flex-direction: row !important; 
+        flex-wrap: nowrap !important; 
+        gap: 2px !important; 
+        justify-content: flex-start !important; 
+        align-items: center !important;
     }
     div[data-testid="stRadio"] div[role="radiogroup"] > label { 
-        background-color: #F8FAFC; 
-        border: 1px solid #CBD5E1; 
-        padding: 4px 8px !important; 
-        border-radius: 6px; 
-        cursor: pointer; 
-        font-weight: 700; 
-        font-size: 0.78rem !important; 
-        color: #334155;
+        background-color: #F8FAFC !important; 
+        border: 1px solid #CBD5E1 !important; 
+        padding: 3px 5px !important; 
+        border-radius: 6px !important; 
+        cursor: pointer !important; 
+        font-weight: 700 !important; 
+        font-size: 0.75rem !important; 
+        color: #334155 !important;
         white-space: nowrap !important;
         text-align: center !important;
         min-width: auto !important;
+        margin: 0px !important;
     }
     div[data-testid="stRadio"] div[role="radiogroup"] > label > div:first-child { display: none !important; }
     div[data-testid="stRadio"] div[role="radiogroup"] > label[data-checked="true"] { 
@@ -328,9 +333,9 @@ else:
 img_base64 = get_image_base64(avatar_file)
 avatar_src = f"data:image/png;base64,{img_base64}" if img_base64 else "https://cdn-icons-png.flaticon.com/512/4140/4140048.png"
 
-# --- HEADER REORGANIZADO COM FILTROS EMBAIXO DO BALÃO ---
+# --- HEADER REORGANIZADO E COMPACTADO ---
 with st.container(border=True):
-    col_av, col_content = st.columns([1.4, 7.6])
+    col_av, col_content = st.columns([1.3, 7.7])
     
     with col_av:
         st.markdown(f"""
@@ -352,7 +357,7 @@ with st.container(border=True):
         
         st.markdown("<div style='margin-top: 8px;'></div>", unsafe_allow_html=True)
         
-        c_ano, c_mes = st.columns([1.1, 7.9])
+        c_ano, c_mes = st.columns([0.95, 8.05])
         with c_ano:
             ano_selecionado = st.selectbox("Ano", [2026, 2027], index=0, label_visibility="collapsed")
         with c_mes:
@@ -363,10 +368,10 @@ with st.container(border=True):
 with st.container(border=True):
     st.markdown('<div class="card-header-navy">📊 RESUMO EXECUTIVO GERAL</div>', unsafe_allow_html=True)
     c1, c2, c3, c4 = st.columns(4)
-    with c1: st.markdown(f'<div class="kpi-card-box kpi-card-blue"><div class="kpi-title">Total Entradas PIX</div><div class="kpi-value-main" style="color:#0284C7;">{fmt_brl(total_entradas_pix)}</div><div class="kpi-subtext">Salário + Adiantamento</div></div>', unsafe_allow_html=True)
-    with c2: st.markdown(f'<div class="kpi-card-box kpi-card-blue"><div class="kpi-title">Total Entradas VR</div><div class="kpi-value-main" style="color:#0369A1;">{fmt_brl(total_entradas_vr)}</div><div class="kpi-subtext">Cartão Flash Exclusivo</div></div>', unsafe_allow_html=True)
-    with c3: st.markdown(f'<div class="kpi-card-box kpi-card-orange"><div class="kpi-title">Total Saídas PIX</div><div class="kpi-value-main" style="color:#FF5722;">{fmt_brl(total_saidas_pix)}</div><div class="kpi-subtext">Todos os gastos em conta</div></div>', unsafe_allow_html=True)
-    with c4: st.markdown(f'<div class="kpi-card-box kpi-card-green"><div class="kpi-title">Sobra do Mês</div><div class="kpi-value-main" style="color:#10B981;">{fmt_brl(sobra_liquida)}</div><div class="kpi-subtext">Entradas PIX - Saídas PIX</div></div>', unsafe_allow_html=True)
+    with c1: st.markdown(f'<div class="kpi-card-box kpi-card-blue"><div class="kpi-title">Total Entradas PIX</div><div class="kpi-value-main" style="font-size: 1.8rem; font-weight: 800; color:#0284C7; margin: 4px 0;">{fmt_brl(total_entradas_pix)}</div><div class="kpi-subtext">Salário + Adiantamento</div></div>', unsafe_allow_html=True)
+    with c2: st.markdown(f'<div class="kpi-card-box kpi-card-blue"><div class="kpi-title">Total Entradas VR</div><div class="kpi-value-main" style="font-size: 1.8rem; font-weight: 800; color:#0369A1; margin: 4px 0;">{fmt_brl(total_entradas_vr)}</div><div class="kpi-subtext">Cartão Flash Exclusivo</div></div>', unsafe_allow_html=True)
+    with c3: st.markdown(f'<div class="kpi-card-box kpi-card-orange"><div class="kpi-title">Total Saídas PIX</div><div class="kpi-value-main" style="font-size: 1.8rem; font-weight: 800; color:#FF5722; margin: 4px 0;">{fmt_brl(total_saidas_pix)}</div><div class="kpi-subtext">Todos os gastos em conta</div></div>', unsafe_allow_html=True)
+    with c4: st.markdown(f'<div class="kpi-card-box kpi-card-green"><div class="kpi-title">Sobra do Mês</div><div class="kpi-value-main" style="font-size: 1.8rem; font-weight: 800; color:#10B981; margin: 4px 0;">{fmt_brl(sobra_liquida)}</div><div class="kpi-subtext">Entradas PIX - Saídas PIX</div></div>', unsafe_allow_html=True)
 
 # --- 2. DETALHAMENTO DE ENTRADAS, SAÍDAS E SOBRAS POR JANELA DE PAGAMENTO (PIX) ---
 with st.container(border=True):
@@ -725,7 +730,7 @@ with st.container(border=True):
             if pct_gasto_total <= 60 and dia_atual <= 15:
                 status_mes_bottom = "🟢 <b style='color:#10B981;'>Mês sob controle!</b> Estamos no início do mês e os gastos estão bem moderados. Excelente ritmo de economia!"
             elif pct_gasto_total > 75 or (pct_gasto_total > 50 and dia_atual <= 10):
-                status_mes_bottom = "🔴 <b style='color:#FF5722;'>Alerta Vermelho!</b> Estamos na primeira quinzena e uma grande parte da sua receita já foi compromised. Sugiro pisar no freio nas despesas variáveis."
+                status_mes_bottom = "🔴 <b style='color:#FF5722;'>Alerta Vermelho!</b> Estamos na primeira quinzena e uma grande parte da sua receita já foi comprometida. Sugiro pisar no freio nas despesas variáveis."
             elif pct_gasto_total >= 90:
                 status_mes_bottom = "🔴 <b style='color:#FF5722;'>Orçamento no Limite!</b> Você está gastando quase tudo que entrou. Evite qualquer compra não essencial agora."
             elif pct_gasto_total < 80 and dia_atual > 15:
