@@ -1,31 +1,34 @@
-import streamlit as st
-import pandas as pd
-import numpy as np
-import plotly.express as px
-import plotly.graph_objects as go
-import urllib.parse
-import re
 import base64
 from datetime import datetime
+import re
+import urllib.parse
+import numpy as np
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+import streamlit as st
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(
     page_title="CONTROLE FINANCEIRO - PAMELLA",
     page_icon="💼",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="collapsed",
 )
+
 
 # --- FUNÇÃO PARA CARREGAR IMAGEM LOCAL ---
 def get_image_base64(path):
-    try:
-        with open(path, "rb") as img_file:
-            return base64.b64encode(img_file.read()).decode('utf-8')
-    except Exception:
-        return ""
+  try:
+    with open(path, "rb") as img_file:
+      return base64.b64encode(img_file.read()).decode("utf-8")
+  except Exception:
+    return ""
+
 
 # --- ESTILIZAÇÃO CSS EXECUTIVA ---
-st.markdown("""
+st.markdown(
+    """
 <style>
     .block-container {
         padding-top: 1.2rem !important;
@@ -158,102 +161,255 @@ st.markdown("""
     }
     div[data-testid="stRadio"] div[role="radiogroup"] > label[data-checked="true"] * { color: #FFFFFF !important; }
 </style>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
+
 
 # --- FUNÇÕES DE LIMPEZA E FORMATAÇÃO ---
 def limpar_valor(val):
-    if pd.isna(val): return 0.0
-    if isinstance(val, (int, float)): return float(val)
-    s = str(val).replace('R$', '').replace(' ', '').replace('\xa0', '').strip()
-    if not s: return 0.0
-    if ',' in s: s = s.replace('.', '').replace(',', '.')
-    try: return float(s)
-    except: return 0.0
+  if pd.isna(val):
+    return 0.0
+  if isinstance(val, (int, float)):
+    return float(val)
+  s = str(val).replace("R$", "").replace(" ", "").replace("\xa0", "").strip()
+  if not s:
+    return 0.0
+  if "," in s:
+    s = s.replace(".", "").replace(",", ".")
+  try:
+    return float(s)
+  except:
+    return 0.0
+
 
 def fmt_brl(valor):
-    try: return f"R$ {float(valor):,.2f}".replace(',', 'v').replace('.', ',').replace('v', '.')
-    except: return "R$ 0,00"
+  try:
+    return (
+        f"R$ {float(valor):,.2f}".replace(",", "v")
+        .replace(".", ",")
+        .replace("v", ".")
+    )
+  except:
+    return "R$ 0,00"
+
 
 def obter_coluna_valor_principal(df):
-    if df.empty: return None
-    cols = [c for c in df.columns if any(p in c.lower() for p in ['valor', 'total', 'receber', 'saldo', 'devedor']) and 'juros' not in c.lower()]
-    if cols: return cols[-1]
-    return df.columns[-1]
+  if df.empty:
+    return None
+  cols = [
+      c
+      for c in df.columns
+      if any(
+          p in c.lower()
+          for p in ["valor", "total", "receber", "saldo", "devedor"]
+      )
+      and "juros" not in c.lower()
+  ]
+  if cols:
+    return cols[-1]
+  return df.columns[-1]
+
 
 def obter_coluna_por_termo(df, termos):
-    if df.empty: return None
-    for t in termos:
-        for c in df.columns:
-            if t in c.lower(): return c
+  if df.empty:
     return None
+  for t in termos:
+    for c in df.columns:
+      if t in c.lower():
+        return c
+  return None
 
-def obter_coluna_data_fim(df):
-    if df.empty: return None
-    cols = [c for c in df.columns if any(p in c.lower() for p in ['fim', 'final', 'término', 'termino', 'última', 'ultima', 'quitação', 'finalização'])]
-    if cols: return cols[-1]
-    return None
 
 # --- CONEXÃO COM O GOOGLE SHEETS ---
 SHEET_ID = "1Y7EsUDd9J_liLwwTbRdjM2lM_XcdsWr_kYNUC-MAZsY"
 
-def carregar_aba(nomes_possiveis):
-    if isinstance(nomes_possiveis, str): nomes_possiveis = [nomes_possiveis]
-    for nome in nomes_possiveis:
-        try:
-            url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={urllib.parse.quote(nome)}"
-            df = pd.read_csv(url)
-            if not df.empty and len(df.columns) > 1: return df
-        except: continue
-    return pd.DataFrame()
 
-df_dividas_atrasadas = carregar_aba(["Dividas atrasadas", "Dívidas Atrasadas", "Dividas"])
-df_dividas_fixas = carregar_aba(["Custos/parcelamentos ativos", "Custos e parcelamentos ativos", "Custos Ativos", "Dividas Fixas", "Dívidas Fixas", "Parcelamentos Fixos"])
+def carregar_aba(nomes_possiveis):
+  if isinstance(nomes_possiveis, str):
+    nomes_possiveis = [nomes_possiveis]
+  for nome in nomes_possiveis:
+    try:
+      url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={urllib.parse.quote(nome)}"
+      df = pd.read_csv(url)
+      if not df.empty and len(df.columns) > 1:
+        return df
+    except:
+      continue
+  return pd.DataFrame()
+
+
+df_dividas_atrasadas = carregar_aba(
+    ["Dividas atrasadas", "Dívidas Atrasadas", "Dividas"]
+)
+df_dividas_fixas = carregar_aba([
+    "Custos/parcelamentos ativos",
+    "Custos e parcelamentos ativos",
+    "Custos Ativos",
+    "Dividas Fixas",
+    "Dívidas Fixas",
+    "Parcelamentos Fixos",
+])
 df_entradas = carregar_aba(["Entradas", "Entradas Agosto"])
 df_saidas = carregar_aba(["Saídas", "Saidas"])
-
-# Carregamento específico para Caixinha Viagem
 df_viagem = carregar_aba(["Caixinha Viagem", "Caixinha viagem", "Viagem"])
 
-# --- PROCESSAMENTO PRÉVIO ---
-col_desc_sai = obter_coluna_por_termo(df_saidas, ['descrição do gasto', 'descrição', 'descricao'])
-col_parc_sai = obter_coluna_por_termo(df_saidas, ['parcelamento', 'parcela'])
-col_tipo_gasto_sai = obter_coluna_por_termo(df_saidas, ['tipo de gasto', 'categoria'])
-col_tipo_pag_sai = obter_coluna_por_termo(df_saidas, ['tipo de pagamento', 'pagamento', 'meio', 'forma'])
+# --- HEADER COM SELETORES ---
+meses_botoes = [
+    "jan",
+    "fev",
+    "mar",
+    "abr",
+    "mai",
+    "jun",
+    "jul",
+    "ago",
+    "set",
+    "out",
+    "nov",
+    "dez",
+]
+meses_map = {m: i + 1 for i, m in enumerate(meses_botoes)}
+
+# Renderiza primeiro a estrutura para obter os seletores
+dia_atual = datetime.now().day
+if dia_atual == 0:
+  dia_atual = 1
+
+# Pré-cálculo rápido para a mensagem do semáforo antes de filtrar
+pct_gasto_total = 0.0
+
+with st.container(border=True):
+  col_av, col_content = st.columns([1.3, 7.7])
+  with col_av:
+    # Avatar temporário até calcular semáforo do mês
+    avatar_src = "https://cdn-icons-png.flaticon.com/512/4140/4140048.png"
+    st.markdown(
+        f"""
+        <div style="display: flex; justify-content: center; align-items: center; height: 100%; padding-top: 5px;">
+            <img src="{avatar_src}" class="avatar-frame" style="border: 5px solid #10B981;" alt="Avatar da Assistente">
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+  with col_content:
+    st.markdown(
+        """
+        <h2 style='margin:0; padding-top:0px; font-size:1.65rem; font-weight:800; color:#0F172A;'>CONTROLE FINANCEIRO <span style='color:#FF5722;'>PAMELLA</span></h2>
+        <div class="speech-bubble">
+            <b style="color:#10B981; font-size:1.0rem;">🟢 Painel Carregado!</b> <span style="font-size:0.85rem; color:#64748B;">Selecione o mês para analisar os dados. 😊</span><br>
+            <span style="font-size:0.85rem; color:#334155; display:inline-block; margin-top:2px;">
+                Caso queira saber mais, acesse o painel <a href="#insights" style="color:#0284C7; font-weight:700; text-decoration:none;">INSIGHTS DA ASSISTENTE clicando aqui</a>.
+            </span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.markdown("<div style='margin-top: 8px;'></div>", unsafe_allow_html=True)
+    c_ano, c_mes = st.columns([0.95, 8.05])
+    with c_ano:
+      ano_selecionado = st.selectbox(
+          "Ano", [2026, 2027], index=0, label_visibility="collapsed"
+      )
+    with c_mes:
+      mes_selecionado = st.radio(
+          "Mês",
+          meses_botoes,
+          index=8,
+          horizontal=True,
+          label_visibility="collapsed",
+      )
+
+num_mes_sel = meses_map[mes_selecionado]
+
+# --- FILTRAGEM RIGOROSA POR MÊS E ANO ---
+col_desc_sai = obter_coluna_por_termo(
+    df_saidas, ["descrição do gasto", "descrição", "descricao"]
+)
+col_parc_sai = obter_coluna_por_termo(df_saidas, ["parcelamento", "parcela"])
+col_tipo_gasto_sai = obter_coluna_por_termo(
+    df_saidas, ["tipo de gasto", "categoria"]
+)
+col_tipo_pag_sai = obter_coluna_por_termo(
+    df_saidas, ["tipo de pagamento", "pagamento", "meio", "forma"]
+)
 col_val_sai = obter_coluna_valor_principal(df_saidas)
-col_data = obter_coluna_por_termo(df_saidas, ['data'])
+col_data_sai = obter_coluna_por_termo(df_saidas, ["data"])
 
 if not df_saidas.empty and col_val_sai:
-    df_saidas['Valor_Clean'] = df_saidas[col_val_sai].apply(limpar_valor)
-    if col_data:
-        df_saidas['Dia'] = pd.to_datetime(df_saidas[col_data], format='%d/%m/%Y', errors='coerce').dt.day
-        df_saidas['Dia'] = df_saidas['Dia'].fillna(1)
-    else:
-        df_saidas['Dia'] = 1
+  df_saidas["Valor_Clean"] = df_saidas[col_val_sai].apply(limpar_valor)
+  if col_data_sai:
+    df_saidas["Data_dt"] = pd.to_datetime(
+        df_saidas[col_data_sai], format="%d/%m/%Y", errors="coerce"
+    )
+    df_saidas["Dia"] = df_saidas["Data_dt"].dt.day.fillna(1)
+    df_saidas_mes = df_saidas[
+        (df_saidas["Data_dt"].dt.month == num_mes_sel)
+        & (df_saidas["Data_dt"].dt.year == ano_selecionado)
+    ].copy()
+  else:
+    df_saidas["Dia"] = 1
+    df_saidas_mes = df_saidas.copy()
+else:
+  df_saidas_mes = pd.DataFrame()
 
+# Processamento de Entradas filtradas
+col_data_ent = obter_coluna_por_termo(df_entradas, ["data"])
+col_val_ent = obter_coluna_valor_principal(df_entradas)
+
+if not df_entradas.empty and col_val_ent:
+  df_entradas["Valor_Clean"] = df_entradas[col_val_ent].apply(limpar_valor)
+  if col_data_ent:
+    df_entradas["Data_dt"] = pd.to_datetime(
+        df_entradas[col_data_ent], format="%d/%m/%Y", errors="coerce"
+    )
+    df_entradas_mes = df_entradas[
+        (df_entradas["Data_dt"].dt.month == num_mes_sel)
+        & (df_entradas["Data_dt"].dt.year == ano_selecionado)
+    ].copy()
+  else:
+    df_entradas_mes = df_entradas.copy()
+else:
+  df_entradas_mes = pd.DataFrame()
+
+# CÁLCULO DE TOTALIZADORES DO MÊS SELECIONADO
 total_entradas_pix, total_entradas_vr = 0.0, 0.0
 entradas_salario_pix, entradas_adiantamento_pix = 0.0, 0.0
 
-if not df_entradas.empty:
-    try:
-        col_val_ent = obter_coluna_valor_principal(df_entradas)
-        df_entradas['Valor_Clean'] = df_entradas[col_val_ent].apply(limpar_valor)
-        txt_ent = df_entradas.astype(str).agg(' '.join, axis=1)
-        
-        mask_ent_pix = txt_ent.str.contains('PIX|Dinheiro|Conta', case=False, na=False)
-        mask_ent_vr = txt_ent.str.contains('VR|Crédito|Flash', case=False, na=False)
-        total_entradas_pix = df_entradas[mask_ent_pix]['Valor_Clean'].sum()
-        total_entradas_vr = df_entradas[mask_ent_vr]['Valor_Clean'].sum()
-        
-        mask_salario = txt_ent.str.contains('Salário|Salario|Transporte|04/09|04/|05/', case=False, na=False)
-        mask_adiant = txt_ent.str.contains('Adiantamento|15/09|15/', case=False, na=False)
-        entradas_salario_pix = df_entradas[mask_ent_pix & mask_salario]['Valor_Clean'].sum()
-        entradas_adiantamento_pix = df_entradas[mask_ent_pix & mask_adiant]['Valor_Clean'].sum()
-    except: pass
+if not df_entradas_mes.empty:
+  try:
+    txt_ent = df_entradas_mes.astype(str).agg(" ".join, axis=1)
+    mask_ent_pix = txt_ent.str.contains(
+        "PIX|Dinheiro|Conta", case=False, na=False
+    )
+    mask_ent_vr = txt_ent.str.contains(
+        "VR|Crédito|Flash", case=False, na=False
+    )
 
-if total_entradas_pix == 0: total_entradas_pix = 3902.30
-if total_entradas_vr == 0: total_entradas_vr = 682.50
-if entradas_salario_pix == 0: entradas_salario_pix = 2052.30
-if entradas_adiantamento_pix == 0: entradas_adiantamento_pix = 1850.00
+    total_entradas_pix = df_entradas_mes[mask_ent_pix]["Valor_Clean"].sum()
+    total_entradas_vr = df_entradas_mes[mask_ent_vr]["Valor_Clean"].sum()
+
+    mask_salario = txt_ent.str.contains(
+        "Salário|Salario|Transporte", case=False, na=False
+    )
+    mask_adiant = txt_ent.str.contains("Adiantamento", case=False, na=False)
+
+    entradas_salario_pix = df_entradas_mes[mask_ent_pix & mask_salario][
+        "Valor_Clean"
+    ].sum()
+    entradas_adiantamento_pix = df_entradas_mes[mask_ent_pix & mask_adiant][
+        "Valor_Clean"
+    ].sum()
+
+    if (
+        entradas_salario_pix == 0
+        and entradas_adiantamento_pix == 0
+        and total_entradas_pix > 0
+    ):
+      entradas_salario_pix = total_entradas_pix
+  except:
+    pass
+
 total_receita_conta = entradas_salario_pix + entradas_adiantamento_pix
 
 total_saidas_pix, saidas_salario_pix, saidas_adiantamento_pix = 0.0, 0.0, 0.0
@@ -261,106 +417,115 @@ gasto_gasolina_vr, gasto_gasolina_pix = 0.0, 0.0
 gasto_lucca_vr, gasto_lucca_pix = 0.0, 0.0
 mask_parcelamentos = pd.Series(dtype=bool)
 
-if not df_saidas.empty and col_tipo_pag_sai:
-    try:
-        txt_sai = df_saidas.astype(str).agg(' '.join, axis=1)
-        mask_sai_pix = df_saidas[col_tipo_pag_sai].astype(str).str.contains('PIX|Dinheiro|Conta|Débito', case=False, na=False) | txt_sai.str.contains('PIX', case=False, na=False)
-        mask_sai_vr = df_saidas[col_tipo_pag_sai].astype(str).str.contains('VR|Flash|Crédito', case=False, na=False)
-        
-        total_saidas_pix = df_saidas[mask_sai_pix]['Valor_Clean'].sum()
-        saidas_salario_pix = df_saidas[mask_sai_pix & (df_saidas['Dia'] < 15)]['Valor_Clean'].sum()
-        saidas_adiantamento_pix = df_saidas[mask_sai_pix & (df_saidas['Dia'] >= 15)]['Valor_Clean'].sum()
-        
-        mask_gasolina = txt_sai.str.contains('Gasolina', case=False, na=False)
-        mask_lucca = txt_sai.str.contains('Lucca|Fralda|Leite', case=False, na=False)
-        gasto_gasolina_vr = df_saidas[mask_gasolina & mask_sai_vr]['Valor_Clean'].sum()
-        gasto_gasolina_pix = df_saidas[mask_gasolina & mask_sai_pix]['Valor_Clean'].sum()
-        gasto_lucca_vr = df_saidas[mask_lucca & mask_sai_vr]['Valor_Clean'].sum()
-        gasto_lucca_pix = df_saidas[mask_lucca & mask_sai_pix]['Valor_Clean'].sum()
-        
-        if col_tipo_gasto_sai:
-            mask_parcelamentos = df_saidas[col_tipo_gasto_sai].astype(str).str.contains('parcelamento|acordo|dívida|divida', case=False, na=False)
-    except: pass
+if not df_saidas_mes.empty:
+  try:
+    txt_sai = df_saidas_mes.astype(str).agg(" ".join, axis=1)
+    if col_tipo_pag_sai:
+      mask_sai_pix = df_saidas_mes[col_tipo_pag_sai].astype(str).str.contains(
+          "PIX|Dinheiro|Conta|Débito", case=False, na=False
+      ) | txt_sai.str.contains("PIX", case=False, na=False)
+      mask_sai_vr = df_saidas_mes[col_tipo_pag_sai].astype(str).str.contains(
+          "VR|Flash|Crédito", case=False, na=False
+      )
+    else:
+      mask_sai_pix = pd.Series(True, index=df_saidas_mes.index)
+      mask_sai_vr = pd.Series(False, index=df_saidas_mes.index)
 
-if df_saidas.empty or total_saidas_pix == 0:
-    total_saidas_pix = 1636.32
-    saidas_salario_pix = 1636.32
-    if gasto_gasolina_vr == 0 and gasto_gasolina_pix == 0: gasto_gasolina_vr = 50.00
-    if gasto_lucca_vr == 0 and gasto_lucca_pix == 0: gasto_lucca_vr = 38.90
+    total_saidas_pix = df_saidas_mes[mask_sai_pix]["Valor_Clean"].sum()
+    saidas_salario_pix = df_saidas_mes[
+        mask_sai_pix & (df_saidas_mes["Dia"] < 15)
+    ]["Valor_Clean"].sum()
+    saidas_adiantamento_pix = df_saidas_mes[
+        mask_sai_pix & (df_saidas_mes["Dia"] >= 15)
+    ]["Valor_Clean"].sum()
+
+    mask_gasolina = txt_sai.str.contains("Gasolina|Posto", case=False, na=False)
+    mask_lucca = txt_sai.str.contains(
+        "Lucca|Fralda|Leite", case=False, na=False
+    )
+    gasto_gasolina_vr = df_saidas_mes[mask_gasolina & mask_sai_vr][
+        "Valor_Clean"
+    ].sum()
+    gasto_gasolina_pix = df_saidas_mes[mask_gasolina & mask_sai_pix][
+        "Valor_Clean"
+    ].sum()
+    gasto_lucca_vr = df_saidas_mes[mask_lucca & mask_sai_vr][
+        "Valor_Clean"
+    ].sum()
+    gasto_lucca_pix = df_saidas_mes[mask_lucca & mask_sai_pix][
+        "Valor_Clean"
+    ].sum()
+
+    if col_tipo_gasto_sai:
+      mask_parcelamentos = (
+          df_saidas_mes[col_tipo_gasto_sai]
+          .astype(str)
+          .str.contains(
+              "parcelamento|acordo|dívida|divida", case=False, na=False
+          )
+      )
+  except:
+    pass
 
 sobra_liquida = total_entradas_pix - total_saidas_pix
 sobra_salario = entradas_salario_pix - saidas_salario_pix
 sobra_adiantamento = entradas_adiantamento_pix - saidas_adiantamento_pix
 
-# --- CALCULO DO DIAGNÓSTICO DO SEMÁFORO DA ASSISTENTE ---
-pct_gasto_total = (total_saidas_pix / total_entradas_pix) * 100 if total_entradas_pix > 0 else 100
-dia_atual = datetime.now().day
-if dia_atual == 0: dia_atual = 1
-
-if pct_gasto_total <= 60 and dia_atual <= 15:
-    cor_semaforo = "#10B981"
-    border_semaforo = "#10B981"
-    status_texto = "🟢 Mês sob controle!"
-    assistente_expressao = "Tudo dentro do planejado! 😊"
-    avatar_file = "assistente_feliz.png"
-elif pct_gasto_total > 75 or (pct_gasto_total > 50 and dia_atual <= 10):
-    cor_semaforo = "#FF5722"
-    border_semaforo = "#FF5722"
-    status_texto = "🔴 Alerta de Gastos!"
-    assistente_expressao = "Hora de pisar no freio! 😟"
-    avatar_file = "assistente_triste.png"
-else:
-    cor_semaforo = "#F59E0B"
-    border_semaforo = "#F59E0B"
-    status_texto = "🟡 Atenção ao orçamento!"
-    assistente_expressao = "Vamos monitorar com cuidado. 😐"
-    avatar_file = "assistente_atenta.png"
-
-img_base64 = get_image_base64(avatar_file)
-avatar_src = f"data:image/png;base64,{img_base64}" if img_base64 else "https://cdn-icons-png.flaticon.com/512/4140/4140048.png"
-
-# --- HEADER REORGANIZADO ---
-with st.container(border=True):
-    col_av, col_content = st.columns([1.3, 7.7])
-    with col_av:
-        st.markdown(f"""
-        <div style="display: flex; justify-content: center; align-items: center; height: 100%; padding-top: 5px;">
-            <img src="{avatar_src}" class="avatar-frame" style="border: 5px solid {border_semaforo};" alt="Avatar da Assistente">
-        </div>
-        """, unsafe_allow_html=True)
-    with col_content:
-        st.markdown(f"""
-        <h2 style='margin:0; padding-top:0px; font-size:1.65rem; font-weight:800; color:#0F172A;'>CONTROLE FINANCEIRO <span style='color:#FF5722;'>PAMELLA</span></h2>
-        <div class="speech-bubble">
-            <b style="color:{cor_semaforo}; font-size:1.0rem;">{status_texto}</b> <span style="font-size:0.85rem; color:#64748B;">{assistente_expressao}</span><br>
-            <span style="font-size:0.85rem; color:#334155; display:inline-block; margin-top:2px;">
-                Caso queira saber mais, acesse o painel <a href="#insights" style="color:#0284C7; font-weight:700; text-decoration:none;">INSIGHTS DA ASSISTENTE clicando aqui</a>.
-            </span>
-        </div>
-        """, unsafe_allow_html=True)
-        st.markdown("<div style='margin-top: 8px;'></div>", unsafe_allow_html=True)
-        c_ano, c_mes = st.columns([0.95, 8.05])
-        with c_ano:
-            ano_selecionado = st.selectbox("Ano", [2026, 2027], index=0, label_visibility="collapsed")
-        with c_mes:
-            meses_botoes = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"]
-            mes_selecionado = st.radio("Mês", meses_botoes, index=8, horizontal=True, label_visibility="collapsed")
-
 # --- 1. RESUMO EXECUTIVO GERAL ---
 with st.container(border=True):
-    st.markdown('<div class="card-header-navy">📊 RESUMO EXECUTIVO GERAL</div>', unsafe_allow_html=True)
-    c1, c2, c3, c4 = st.columns(4)
-    with c1: st.markdown(f'<div class="kpi-card-box kpi-card-blue"><div class="kpi-title">Total Entradas PIX</div><div class="kpi-value-main" style="color:#0284C7; margin: 4px 0;">{fmt_brl(total_entradas_pix)}</div><div class="kpi-subtext">Salário + Adiantamento</div></div>', unsafe_allow_html=True)
-    with c2: st.markdown(f'<div class="kpi-card-box kpi-card-blue"><div class="kpi-title">Total Entradas VR</div><div class="kpi-value-main" style="color:#0369A1; margin: 4px 0;">{fmt_brl(total_entradas_vr)}</div><div class="kpi-subtext">Cartão Flash Exclusivo</div></div>', unsafe_allow_html=True)
-    with c3: st.markdown(f'<div class="kpi-card-box kpi-card-orange"><div class="kpi-title">Total Saídas PIX</div><div class="kpi-value-main" style="color:#FF5722; margin: 4px 0;">{fmt_brl(total_saidas_pix)}</div><div class="kpi-subtext">Todos os gastos em conta</div></div>', unsafe_allow_html=True)
-    with c4: st.markdown(f'<div class="kpi-card-box kpi-card-green"><div class="kpi-title">Sobra do Mês</div><div class="kpi-value-main" style="color:#10B981; margin: 4px 0;">{fmt_brl(sobra_liquida)}</div><div class="kpi-subtext">Entradas PIX - Saídas PIX</div></div>', unsafe_allow_html=True)
+  st.markdown(
+      '<div class="card-header-navy">📊 RESUMO EXECUTIVO GERAL</div>',
+      unsafe_allow_html=True,
+  )
+  c1, c2, c3, c4 = st.columns(4)
+  with c1:
+    st.markdown(
+        f'<div class="kpi-card-box kpi-card-blue"><div'
+        ' class="kpi-title">Total Entradas PIX</div><div'
+        ' class="kpi-value-main" style="color:#0284C7; margin: 4px'
+        f' 0;">{fmt_brl(total_entradas_pix)}</div><div'
+        ' class="kpi-subtext">Salário + Adiantamento</div></div>',
+        unsafe_allow_html=True,
+    )
+  with c2:
+    st.markdown(
+        f'<div class="kpi-card-box kpi-card-blue"><div'
+        ' class="kpi-title">Total Entradas VR</div><div'
+        ' class="kpi-value-main" style="color:#0369A1; margin: 4px'
+        f' 0;">{fmt_brl(total_entradas_vr)}</div><div'
+        ' class="kpi-subtext">Cartão Flash Exclusivo</div></div>',
+        unsafe_allow_html=True,
+    )
+  with c3:
+    st.markdown(
+        f'<div class="kpi-card-box kpi-card-orange"><div'
+        ' class="kpi-title">Total Saídas PIX</div><div'
+        ' class="kpi-value-main" style="color:#FF5722; margin: 4px'
+        f' 0;">{fmt_brl(total_saidas_pix)}</div><div'
+        ' class="kpi-subtext">Todos os gastos em conta</div></div>',
+        unsafe_allow_html=True,
+    )
+  with c4:
+    st.markdown(
+        f'<div class="kpi-card-box kpi-card-green"><div'
+        ' class="kpi-title">Sobra do Mês</div><div class="kpi-value-main"'
+        ' style="color:#10B981; margin: 4px'
+        f' 0;">{fmt_brl(sobra_liquida)}</div><div class="kpi-subtext">Entradas'
+        " PIX - Saídas PIX</div></div>",
+        unsafe_allow_html=True,
+    )
 
 # --- 2. DETALHAMENTO DE ENTRADAS, SAÍDAS E SOBRAS ---
 with st.container(border=True):
-    st.markdown('<div class="card-header-navy">📅 DETALHAMENTO DE ENTRADAS, SAÍDAS E SOBRAS POR JANELA DE PAGAMENTO (PIX)</div>', unsafe_allow_html=True)
-    cj1, cj2 = st.columns(2)
-    with cj1:
-        st.markdown(f"""
+  st.markdown(
+      '<div class="card-header-navy">📅 DETALHAMENTO DE ENTRADAS, SAÍDAS E'
+      " SOBRAS POR JANELA DE PAGAMENTO (PIX)</div>",
+      unsafe_allow_html=True,
+  )
+  cj1, cj2 = st.columns(2)
+  with cj1:
+    st.markdown(
+        f"""
         <div style="background:#F8FAFC; padding:20px; border-radius:8px; border:1px solid #CBD5E1;">
             <div style="font-size:1.15rem; font-weight:800; color:#0F172A; margin-bottom:12px; border-bottom:1px solid #CBD5E1; padding-bottom:6px;">💳 Janela Salário (Dia 05)</div>
             <div style="display:flex; justify-content:space-between; margin-bottom:8px;"><span style="color:#334155; font-weight:600;">Entrada Salário (PIX):</span><span style="color:#0284C7; font-weight:800; font-size:1.1rem;">{fmt_brl(entradas_salario_pix)}</span></div>
@@ -368,9 +533,12 @@ with st.container(border=True):
             <div style="background-color:#CBD5E1; height:1px; width:100%; margin:12px 0;"></div>
             <div style="display:flex; justify-content:space-between; align-items:center;"><span style="color:#0F172A; font-weight:800; font-size:1.2rem;">💰 Quanto Sobrou:</span><span style="color:#10B981; font-weight:800; font-size:1.5rem;">{fmt_brl(sobra_salario)}</span></div>
         </div>
-        """, unsafe_allow_html=True)
-    with cj2:
-        st.markdown(f"""
+        """,
+        unsafe_allow_html=True,
+    )
+  with cj2:
+    st.markdown(
+        f"""
         <div style="background:#F8FAFC; padding:20px; border-radius:8px; border:1px solid #CBD5E1;">
             <div style="font-size:1.15rem; font-weight:800; color:#0F172A; margin-bottom:12px; border-bottom:1px solid #CBD5E1; padding-bottom:6px;">💳 Janela Adiantamento (Dia 15)</div>
             <div style="display:flex; justify-content:space-between; margin-bottom:8px;"><span style="color:#334155; font-weight:600;">Entrada Adiantamento (PIX):</span><span style="color:#0284C7; font-weight:800; font-size:1.1rem;">{fmt_brl(entradas_adiantamento_pix)}</span></div>
@@ -378,21 +546,36 @@ with st.container(border=True):
             <div style="background-color:#CBD5E1; height:1px; width:100%; margin:12px 0;"></div>
             <div style="display:flex; justify-content:space-between; align-items:center;"><span style="color:#0F172A; font-weight:800; font-size:1.2rem;">💰 Quanto Sobrou:</span><span style="color:#10B981; font-weight:800; font-size:1.5rem;">{fmt_brl(sobra_adiantamento)}</span></div>
         </div>
-        """, unsafe_allow_html=True)
+        """,
+        unsafe_allow_html=True,
+    )
 
 # --- 3. CAIXINHA DE ESSENCIAIS ---
 caixinha_gasolina = 400.00
 caixinha_lucca = 480.00
 gasto_gas_tot = gasto_gasolina_vr + gasto_gasolina_pix
-pct_gas = min(100.0, (gasto_gas_tot / caixinha_gasolina) * 100) if caixinha_gasolina > 0 else 0
+pct_gas = (
+    min(100.0, (gasto_gas_tot / caixinha_gasolina) * 100)
+    if caixinha_gasolina > 0
+    else 0
+)
 gasto_lucca_tot = gasto_lucca_vr + gasto_lucca_pix
-pct_lucca = min(100.0, (gasto_lucca_tot / caixinha_lucca) * 100) if caixinha_lucca > 0 else 0
+pct_lucca = (
+    min(100.0, (gasto_lucca_tot / caixinha_lucca) * 100)
+    if caixinha_lucca > 0
+    else 0
+)
 
 with st.container(border=True):
-    st.markdown('<div class="card-header-orange">📦 CAIXINHA DE ESSENCIAIS (RESERVA OBRIGATÓRIA MENSAL)</div>', unsafe_allow_html=True)
-    col_ess1, col_ess2 = st.columns(2)
-    with col_ess1:
-        st.markdown(f"""
+  st.markdown(
+      '<div class="card-header-orange">📦 CAIXINHA DE ESSENCIAIS (RESERVA'
+      " OBRIGATÓRIA MENSAL)</div>",
+      unsafe_allow_html=True,
+  )
+  col_ess1, col_ess2 = st.columns(2)
+  with col_ess1:
+    st.markdown(
+        f"""
         <div style="background:#F8FAFC; padding:18px; border-radius:8px; border:1px solid #CBD5E1;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
                 <span style="font-weight:800; font-size:1.1rem; color:#0F172A;">🚗 Gasolina: {fmt_brl(caixinha_gasolina)}</span>
@@ -408,9 +591,12 @@ with st.container(border=True):
                 • <b>Restante na Caixinha:</b> <span style="color:#10B981; font-weight:800;">{fmt_brl(max(0, caixinha_gasolina - gasto_gas_tot))}</span>
             </div>
         </div>
-        """, unsafe_allow_html=True)
-    with col_ess2:
-        st.markdown(f"""
+        """,
+        unsafe_allow_html=True,
+    )
+  with col_ess2:
+    st.markdown(
+        f"""
         <div style="background:#F8FAFC; padding:18px; border-radius:8px; border:1px solid #CBD5E1;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
                 <span style="font-weight:800; font-size:1.1rem; color:#0F172A;">👶 Lucca (Fralda/Leite): {fmt_brl(caixinha_lucca)}</span>
@@ -426,25 +612,37 @@ with st.container(border=True):
                 • <b>Restante na Caixinha:</b> <span style="color:#10B981; font-weight:800;">{fmt_brl(max(0, caixinha_lucca - gasto_lucca_tot))}</span>
             </div>
         </div>
-        """, unsafe_allow_html=True)
+        """,
+        unsafe_allow_html=True,
+    )
 
 # --- 4. RAIO-X DO COMBUSTÍVEL ---
 with st.container(border=True):
-    st.markdown('<div class="card-header-navy">⛽ RAIO-X DO COMBUSTÍVEL E CONSUMO</div>', unsafe_allow_html=True)
-    
-    c_gas_in, c_gas_kpi, c_gas_time = st.columns([1, 1.2, 1.8])
-    
-    with c_gas_in:
-        st.markdown("<div style='font-size:0.95rem; font-weight:700; color:#0F172A; margin-bottom:8px;'>⚙️ Seus Parâmetros</div>", unsafe_allow_html=True)
-        preco_gasolina = st.number_input("Preço Médio (R$/Litro)", value=5.80, step=0.10, format="%.2f")
-        km_diario = st.number_input("Média rodada (KM/dia)", value=30, step=1)
-        
-    with c_gas_kpi:
-        litros_est = gasto_gas_tot / preco_gasolina if preco_gasolina > 0 else 0
-        km_rodado_est = km_diario * dia_atual
-        kml_est = km_rodado_est / litros_est if litros_est > 0 else 0
-        
-        st.markdown(f"""
+  st.markdown(
+      '<div class="card-header-navy">⛽ RAIO-X DO COMBUSTÍVEL E CONSUMO</div>',
+      unsafe_allow_html=True,
+  )
+
+  c_gas_in, c_gas_kpi, c_gas_time = st.columns([1, 1.2, 1.8])
+
+  with c_gas_in:
+    st.markdown(
+        "<div style='font-size:0.95rem; font-weight:700; color:#0F172A;"
+        " margin-bottom:8px;'>⚙️ Seus Parâmetros</div>",
+        unsafe_allow_html=True,
+    )
+    preco_gasolina = st.number_input(
+        "Preço Médio (R$/Litro)", value=5.80, step=0.10, format="%.2f"
+    )
+    km_diario = st.number_input("Média rodada (KM/dia)", value=30, step=1)
+
+  with c_gas_kpi:
+    litros_est = gasto_gas_tot / preco_gasolina if preco_gasolina > 0 else 0
+    km_rodado_est = km_diario * dia_atual
+    kml_est = km_rodado_est / litros_est if litros_est > 0 else 0
+
+    st.markdown(
+        f"""
         <div style="background:#F8FAFC; padding:16px; border-radius:8px; border:1px solid #CBD5E1;">
             <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
                 <span style="color:#64748B; font-size:0.85rem; font-weight:700;">Total Gasto no Mês</span>
@@ -464,71 +662,115 @@ with st.container(border=True):
                 <span style="color:#10B981; font-weight:800; font-size:1.2rem;">{kml_est:.1f} km/L</span>
             </div>
         </div>
-        """, unsafe_allow_html=True)
-        
-    with c_gas_time:
-        st.markdown("<div style='font-size:0.95rem; font-weight:700; color:#0F172A; margin-bottom:8px;'>🗓️ Calendário de Abastecimentos</div>", unsafe_allow_html=True)
-        
-        if not df_saidas.empty and col_data and col_desc_sai:
-            df_gas = df_saidas[df_saidas[col_desc_sai].astype(str).str.contains('Gasolina|Posto', case=False, na=False)].copy()
-            
-            if not df_gas.empty:
-                df_gas['Data_Obj'] = pd.to_datetime(df_gas[col_data], format='%d/%m/%Y', errors='coerce')
-                df_gas = df_gas.dropna(subset=['Data_Obj']).sort_values('Data_Obj')
-                
-                cards_html = []
-                for _, rg in df_gas.iterrows():
-                    d_gas = int(rg['Dia'])
-                    v_gas = rg['Valor_Clean']
-                    pag_gas = str(rg[col_tipo_pag_sai]) if col_tipo_pag_sai else ""
-                    
-                    cor_borda = "#0284C7" if "VR" in pag_gas or "Flash" in pag_gas else "#FF5722"
-                    cor_fundo = "#E0F2FE" if "VR" in pag_gas or "Flash" in pag_gas else "#FFEDD5"
-                    
-                    card = f'<div style="background:{cor_fundo}; border:1px solid {cor_borda}; padding:8px 14px; border-radius:8px; text-align:center; min-width:80px;"><div style="font-size:0.75rem; color:{cor_borda}; font-weight:800; text-transform:uppercase;">DIA {d_gas:02d}</div><div style="font-size:0.95rem; color:#0F172A; font-weight:800; margin-top:2px;">{fmt_brl(v_gas)}</div></div>'
-                    cards_html.append(card)
-                
-                html_tl = f'<div style="display:flex; flex-wrap:wrap; gap:10px;">{"".join(cards_html)}</div>'
-                
-                qtd_abs = len(df_gas)
-                if qtd_abs > 1:
-                    primeiro = df_gas['Data_Obj'].iloc[0]
-                    ultimo = df_gas['Data_Obj'].iloc[-1]
-                    span = (ultimo - primeiro).days
-                    freq = span / (qtd_abs - 1) if span > 0 else 0
-                    freq_str = f"A cada {freq:.1f} dias" if freq > 0 else "No mesmo dia"
-                else:
-                    freq_str = f"1 vez em {dia_atual} dias"
-                    
-                st.markdown(html_tl, unsafe_allow_html=True)
-                st.markdown(f"<div style='margin-top:14px; font-size:0.9rem; color:#334155; border-top:1px dashed #CBD5E1; padding-top:8px;'>⏳ <b>Frequência de ida ao posto:</b> {freq_str}</div>", unsafe_allow_html=True)
-            else:
-                st.write("Nenhum abastecimento registrado neste mês.")
+        """,
+        unsafe_allow_html=True,
+    )
+
+  with c_gas_time:
+    st.markdown(
+        "<div style='font-size:0.95rem; font-weight:700; color:#0F172A;"
+        " margin-bottom:8px;'>🗓️ Calendário de Abastecimentos</div>",
+        unsafe_allow_html=True,
+    )
+
+    if not df_saidas_mes.empty and col_data_sai and col_desc_sai:
+      df_gas = df_saidas_mes[
+          df_saidas_mes[col_desc_sai]
+          .astype(str)
+          .str.contains("Gasolina|Posto", case=False, na=False)
+      ].copy()
+
+      if not df_gas.empty:
+        df_gas["Data_Obj"] = pd.to_datetime(
+            df_gas[col_data_sai], format="%d/%m/%Y", errors="coerce"
+        )
+        df_gas = df_gas.dropna(subset=["Data_Obj"]).sort_values("Data_Obj")
+
+        cards_html = []
+        for _, rg in df_gas.iterrows():
+          d_gas = int(rg["Dia"])
+          v_gas = rg["Valor_Clean"]
+          pag_gas = str(rg[col_tipo_pag_sai]) if col_tipo_pag_sai else ""
+
+          cor_borda = (
+              "#0284C7" if "VR" in pag_gas or "Flash" in pag_gas else "#FF5722"
+          )
+          cor_fundo = (
+              "#E0F2FE" if "VR" in pag_gas or "Flash" in pag_gas else "#FFEDD5"
+          )
+
+          card = (
+              f'<div style="background:{cor_fundo}; border:1px solid'
+              f' {cor_borda}; padding:8px 14px; border-radius:8px;'
+              ' text-align:center; min-width:80px;"><div'
+              f' style="font-size:0.75rem; color:{cor_borda}; font-weight:800;'
+              f' text-transform:uppercase;">DIA {d_gas:02d}</div><div'
+              ' style="font-size:0.95rem; color:#0F172A; font-weight:800;'
+              f' margin-top:2px;">{fmt_brl(v_gas)}</div></div>'
+          )
+          cards_html.append(card)
+
+        html_tl = (
+            '<div style="display:flex; flex-wrap:wrap;'
+            f' gap:10px;">{"".join(cards_html)}</div>'
+        )
+
+        qtd_abs = len(df_gas)
+        if qtd_abs > 1:
+          primeiro = df_gas["Data_Obj"].iloc[0]
+          ultimo = df_gas["Data_Obj"].iloc[-1]
+          span = (ultimo - primeiro).days
+          freq = span / (qtd_abs - 1) if span > 0 else 0
+          freq_str = (
+              f"A cada {freq:.1f} dias" if freq > 0 else "No mesmo dia"
+          )
         else:
-            st.write("Nenhum abastecimento registrado neste mês.")
+          freq_str = f"1 vez em {dia_atual} dias"
+
+        st.markdown(html_tl, unsafe_allow_html=True)
+        st.markdown(
+            "<div style='margin-top:14px; font-size:0.9rem; color:#334155;"
+            " border-top:1px dashed #CBD5E1; padding-top:8px;'>⏳ <b>Frequência de"
+            f" ida ao posto:</b> {freq_str}</div>",
+            unsafe_allow_html=True,
+        )
+      else:
+        st.write("Nenhum abastecimento registrado neste mês.")
+    else:
+      st.write("Nenhum abastecimento registrado neste mês.")
 
 # --- 5. CAIXINHA DE VIAGEM ---
 total_guardado_viagem = 0.0
 meta_viagem = 4000.0
 
 if not df_viagem.empty:
-    cols_viagem_str = ' '.join([str(c).lower() for c in df_viagem.columns])
-    # Validação estrita: Se tiver colunas de dívidas ou outras abas, desconsidera o fallback do Sheets
-    if 'credor' not in cols_viagem_str and 'janela' not in cols_viagem_str:
-        col_valor_viagem = obter_coluna_por_termo(df_viagem, ['quantidade guardada', 'quantidade', 'guardada'])
-        if col_valor_viagem:
-            total_guardado_viagem = df_viagem[col_valor_viagem].apply(limpar_valor).sum()
+  col_val_v = obter_coluna_por_termo(
+      df_viagem, ["quantidade guardada", "quantidade", "guardada"]
+  )
+  if col_val_v:
+    total_guardado_viagem = df_viagem[col_val_v].apply(limpar_valor).sum()
 
-pct_viagem = min((total_guardado_viagem / meta_viagem) * 100, 100) if meta_viagem > 0 else 0
+pct_viagem = (
+    min((total_guardado_viagem / meta_viagem) * 100, 100)
+    if meta_viagem > 0
+    else 0
+)
 falta_viagem = max(meta_viagem - total_guardado_viagem, 0)
 
 with st.container(border=True):
-    st.markdown('<div class="card-header-orange" style="background: linear-gradient(90deg, #0284C7 0%, #0369A1 100%); color: #FFFFFF; padding: 14px 24px; font-weight: 700; font-size: 1rem; text-transform: uppercase; margin: -24px -28px 24px -28px;">✈️ CAIXINHA DE VIAGEM (BAHIA COM O LUCCA)</div>', unsafe_allow_html=True)
-    
-    c_v1, c_v2 = st.columns([1.2, 1])
-    
-    with c_v1:
-        st.markdown(f"""
+  st.markdown(
+      '<div class="card-header-orange" style="background: linear-gradient(90deg,'
+      " #0284C7 0%, #0369A1 100%); color: #FFFFFF; padding: 14px 24px;"
+      " font-weight: 700; font-size: 1rem; text-transform: uppercase; margin:"
+      ' -24px -28px 24px -28px;">✈️ CAIXINHA DE VIAGEM (BAHIA COM O LUCCA)</div>',
+      unsafe_allow_html=True,
+  )
+
+  c_v1, c_v2 = st.columns([1.2, 1])
+
+  with c_v1:
+    st.markdown(
+        f"""
         <div style="background:#F8FAFC; padding:20px; border-radius:8px; border:1px solid #CBD5E1; height: 100%;">
             <div style="font-size:1.15rem; font-weight:800; color:#0F172A; margin-bottom:12px;">Nossa Meta: {fmt_brl(meta_viagem)}</div>
             <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
@@ -544,41 +786,90 @@ with st.container(border=True):
                 <b>Dica da sua Assistente:</b> Sei que no momento o foco é outro, mas ter esse sonho no radar é o que nos dá energia! Assim que o cartão dar um respiro, começamos com R$ 50 ou R$ 100. A Bahia espera por vocês! 🌴🥥
             </div>
         </div>
-        """, unsafe_allow_html=True)
-        
-    with c_v2:
-        fig_gauge = go.Figure(go.Indicator(
-            mode = "gauge+number",
-            value = pct_viagem,
-            number = {'suffix': "%", 'font': {'size': 40, 'color': '#0F172A', 'family': 'Segoe UI', 'weight': 'bold'}},
-            domain = {'x': [0, 1], 'y': [0, 1]},
-            title = {'text': "Progresso da Viagem", 'font': {'size': 16, 'color': '#64748B', 'family': 'Segoe UI'}},
-            gauge = {
-                'axis': {'range': [None, 100], 'tickwidth': 1, 'tickcolor': "#CBD5E1"},
-                'bar': {'color': "#0284C7"},
-                'bgcolor': "#E2E8F0",
-                'borderwidth': 2,
-                'bordercolor': "#FFFFFF",
-                'steps': [
-                    {'range': [0, 30], 'color': '#FEE2E2'},
-                    {'range': [30, 70], 'color': '#FEF3C7'},
-                    {'range': [70, 100], 'color': '#D1FAE5'}],
-            }
-        ))
-        fig_gauge.update_layout(height=220, margin=dict(l=20, r=20, t=40, b=20), paper_bgcolor='rgba(0,0,0,0)')
-        st.plotly_chart(fig_gauge, use_container_width=True, config={'displayModeBar': False})
+        """,
+        unsafe_allow_html=True,
+    )
+
+  with c_v2:
+    fig_gauge = go.Figure(
+        go.Indicator(
+            mode="gauge+number",
+            value=pct_viagem,
+            number={
+                "suffix": "%",
+                "font": {
+                    "size": 40,
+                    "color": "#0F172A",
+                    "family": "Segoe UI",
+                    "weight": "bold",
+                },
+            },
+            domain={"x": [0, 1], "y": [0, 1]},
+            title={
+                "text": "Progresso da Viagem",
+                "font": {"size": 16, "color": "#64748B", "family": "Segoe UI"},
+            },
+            gauge={
+                "axis": {
+                    "range": [None, 100],
+                    "tickwidth": 1,
+                    "tickcolor": "#CBD5E1",
+                },
+                "bar": {"color": "#0284C7"},
+                "bgcolor": "#E2E8F0",
+                "borderwidth": 2,
+                "bordercolor": "#FFFFFF",
+                "steps": [
+                    {"range": [0, 30], "color": "#FEE2E2"},
+                    {"range": [30, 70], "color": "#FEF3C7"},
+                    {"range": [70, 100], "color": "#D1FAE5"},
+                ],
+            },
+        )
+    )
+    fig_gauge.update_layout(
+        height=220,
+        margin=dict(l=20, r=20, t=40, b=20),
+        paper_bgcolor="rgba(0,0,0,0)",
+    )
+    st.plotly_chart(
+        fig_gauge, use_container_width=True, config={"displayModeBar": False}
+    )
 
 # --- 6. RECEITA OPERACIONAL ---
 with st.container(border=True):
-    st.markdown('<div class="card-header-navy">📈 RECEITA OPERACIONAL EM CONTA & JANELAS DE PAGAMENTO</div>', unsafe_allow_html=True)
-    col_rec_chart, col_rec_box = st.columns([2, 1])
-    with col_rec_chart:
-        df_rec_hist = pd.DataFrame({'Mês': ['Set/26', 'Out/26', 'Nov/26', 'Dez/26'], 'Receita': [total_receita_conta, 0, 0, 0]})
-        fig_rec = px.bar(df_rec_hist, x='Mês', y='Receita', text_auto='.2s', color_discrete_sequence=['#0F172A'])
-        fig_rec.update_layout(height=210, margin=dict(l=5, r=5, t=10, b=10), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', xaxis_title="", yaxis_title="")
-        st.plotly_chart(fig_rec, use_container_width=True, config={'displayModeBar': False})
-    with col_rec_box:
-        st.markdown(f"""
+  st.markdown(
+      '<div class="card-header-navy">📈 RECEITA OPERACIONAL EM CONTA & JANELAS'
+      " DE PAGAMENTO</div>",
+      unsafe_allow_html=True,
+  )
+  col_rec_chart, col_rec_box = st.columns([2, 1])
+  with col_rec_chart:
+    df_rec_hist = pd.DataFrame({
+        "Mês": ["Set/26", "Out/26", "Nov/26", "Dez/26"],
+        "Receita": [total_receita_conta, 0, 0, 0],
+    })
+    fig_rec = px.bar(
+        df_rec_hist,
+        x="Mês",
+        y="Receita",
+        text_auto=".2s",
+        color_discrete_sequence=["#0F172A"],
+    )
+    fig_rec.update_layout(
+        height=210,
+        margin=dict(l=5, r=5, t=10, b=10),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        xaxis_title="",
+        yaxis_title="",
+    )
+    st.plotly_chart(
+        fig_rec, use_container_width=True, config={"displayModeBar": False}
+    )
+  with col_rec_box:
+    st.markdown(
+        f"""
         <div style="background:#F8FAFC; padding:18px; border-radius:8px; border:1px solid #CBD5E1;">
             <div style="font-size:0.9rem; font-weight:bold; color:#0F172A; margin-bottom:4px;">📅 Janela Salário (04/09)</div>
             <div style="font-size:1.3rem; font-weight:800; color:#10B981;">{fmt_brl(entradas_salario_pix)}</div>
@@ -589,105 +880,162 @@ with st.container(border=True):
             <div style="font-size:0.95rem; font-weight:bold; color:#0F172A; margin-bottom:4px;">💰 Total Operacional em Conta</div>
             <div style="font-size:1.5rem; font-weight:800; color:#0F172A;">{fmt_brl(total_receita_conta)}</div>
         </div>
-        """, unsafe_allow_html=True)
+        """,
+        unsafe_allow_html=True,
+    )
 
 # --- 7. MAPEAMENTO DE DÍVIDAS ---
 with st.container(border=True):
-    st.markdown('<div class="card-header-orange">⚠️ MAPEAMENTO DE DÍVIDAS: ATRASADAS</div>', unsafe_allow_html=True)
+  st.markdown(
+      '<div class="card-header-orange">⚠️ MAPEAMENTO DE DÍVIDAS:'
+      " ATRASADAS</div>",
+      unsafe_allow_html=True,
+  )
 
-    if not df_dividas_atrasadas.empty:
-        col_nome_div = obter_coluna_por_termo(df_dividas_atrasadas, ['nome da dívida', 'nome da divida', 'nome'])
-        col_credor_div = obter_coluna_por_termo(df_dividas_atrasadas, ['credor'])
-        col_val_total_div = obter_coluna_valor_principal(df_dividas_atrasadas)
-        col_acordo = obter_coluna_por_termo(df_dividas_atrasadas, ['entrou em acordo', 'acordo'])
-        col_parc_feito = obter_coluna_por_termo(df_dividas_atrasadas, ['parcelamento feito', 'parcelamento'])
-        col_num_parc = obter_coluna_por_termo(df_dividas_atrasadas, ['quantidade', 'num', 'nº'])
-        
-        for idx, row in df_dividas_atrasadas.iterrows():
-            nome_divida = str(row[col_nome_div]).strip() if col_nome_div and pd.notna(row[col_nome_div]) else ""
-            credor_nome = str(row[col_credor_div]).strip() if col_credor_div and pd.notna(row[col_credor_div]) else ""
-            
-            if not nome_divida or nome_divida.lower() == 'nan': nome_divida = credor_nome
-            if not credor_nome or credor_nome.lower() == 'nan': credor_nome = nome_divida
-            if not nome_divida or nome_divida.lower() == 'nan': continue
-            
-            val_total = limpar_valor(row[col_val_total_div]) if col_val_total_div else 0.0
-            if val_total <= 0: continue
-            
-            is_acordado = False
-            if col_acordo and pd.notna(row[col_acordo]):
-                is_acordado = str(row[col_acordo]).strip().lower() in ['sim', 's', 'true', '1', 'ativo']
-            
-            num_parc_total = 1
-            parc_feito_txt = str(row[col_parc_feito]) if col_parc_feito and pd.notna(row[col_parc_feito]) else "-"
-            match_parc = re.search(r'(\d+)\s*x', parc_feito_txt, re.IGNORECASE)
-            if match_parc:
-                num_parc_total = int(match_parc.group(1))
-            elif col_num_parc and pd.notna(row[col_num_parc]):
-                v = limpar_valor(row[col_num_parc])
-                if v > 0: num_parc_total = int(v)
+  if not df_dividas_atrasadas.empty:
+    col_nome_div = obter_coluna_por_termo(
+        df_dividas_atrasadas, ["nome da dívida", "nome da divida", "nome"]
+    )
+    col_credor_div = obter_coluna_por_termo(df_dividas_atrasadas, ["credor"])
+    col_val_total_div = obter_coluna_valor_principal(df_dividas_atrasadas)
+    col_acordo = obter_coluna_por_termo(
+        df_dividas_atrasadas, ["entrou em acordo", "acordo"]
+    )
+    col_parc_feito = obter_coluna_por_termo(
+        df_dividas_atrasadas, ["parcelamento feito", "parcelamento"]
+    )
+    col_num_parc = obter_coluna_por_termo(
+        df_dividas_atrasadas, ["quantidade", "num", "nº"]
+    )
 
-            qtd_pagas = 0
-            total_pago = 0.0
-            
-            if is_acordado and not df_saidas.empty and col_desc_sai:
-                df_saidas_parc = df_saidas.copy()
-                if not mask_parcelamentos.empty and mask_parcelamentos.any():
-                    df_saidas_parc = df_saidas[mask_parcelamentos].copy()
-                
-                credor_alvo = credor_nome.strip().lower()
-                
-                def match_linha_saida(row_sai):
-                    val_desc = str(row_sai[col_desc_sai]).strip().lower() if col_desc_sai else ""
-                    if not val_desc: return False
-                    return (credor_alvo == val_desc) or (credor_alvo in val_desc) or (val_desc in credor_alvo)
-                
-                df_matches = df_saidas_parc[df_saidas_parc.apply(match_linha_saida, axis=1)]
-                
-                if not df_matches.empty:
-                    total_pago = df_matches['Valor_Clean'].sum()
-                    qtd_pagas = 0
-                    
-                    for _, r_match in df_matches.iterrows():
-                        p_str = str(r_match[col_parc_sai]).strip() if col_parc_sai and pd.notna(r_match[col_parc_sai]) else ""
-                        if '/' in p_str:
-                            try:
-                                partes = p_str.split('/')
-                                p_paga = int(partes[0].strip())
-                                p_tot = int(partes[1].strip())
-                                if p_paga > 0:
-                                    qtd_pagas = max(qtd_pagas, p_paga)
-                                if p_tot > 1:
-                                    num_parc_total = p_tot
-                            except: pass
-                    if qtd_pagas == 0:
-                        qtd_pagas = len(df_matches)
-            
-            if is_acordado and num_parc_total <= 1:
-                num_parc_total = 36
-            
-            saldo_restante = max(0.0, val_total - total_pago)
-            faltam_pagar = max(0, num_parc_total - qtd_pagas)
-            
-            cor = "#0284C7" if is_acordado else "#FF5722"
-            bg = "#E0F2FE" if is_acordado else "#FEE2E2"
-            status = "Acordado / Parcelado" if is_acordado else "Pendente"
-            
-            if is_acordado:
-                detalhes_blocos = f"""<div style="flex: 1; min-width: 150px; font-size:0.95rem; color:#334155;">
-<b>Já pago:</b> {qtd_pagas} parcela(s)<br>
-<span style="color:#10B981; font-weight:700;">{fmt_brl(total_pago)}</span>
-</div>
-<div style="flex: 1; min-width: 150px; font-size:0.95rem; color:#334155;">
-<b>Falta pagar:</b> {faltam_pagar} parcela(s)<br>
-<span style="color:#FF5722; font-weight:700;">{fmt_brl(saldo_restante)}</span>
-</div>"""
-            else:
-                detalhes_blocos = """<div style="flex: 2; min-width: 300px; font-size:0.95rem; color:#FF5722; font-weight:600;">
-Aguardando acordo / negociação para este credor.
-</div>"""
-            
-            html_card_atr = f"""<div style="background:#F8FAFC; padding:18px; border-radius:8px; border:1px solid #CBD5E1; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+    for idx, row in df_dividas_atrasadas.iterrows():
+      nome_divida = (
+          str(row[col_nome_div]).strip()
+          if col_nome_div and pd.notna(row[col_nome_div])
+          else ""
+      )
+      credor_nome = (
+          str(row[col_credor_div]).strip()
+          if col_credor_div and pd.notna(row[col_credor_div])
+          else ""
+      )
+
+      if not nome_divida or nome_divida.lower() == "nan":
+        nome_divida = credor_nome
+      if not credor_nome or credor_nome.lower() == "nan":
+        credor_nome = nome_divida
+      if not nome_divida or nome_divida.lower() == "nan":
+        continue
+
+      val_total = (
+          limpar_valor(row[col_val_total_div]) if col_val_total_div else 0.0
+      )
+      if val_total <= 0:
+        continue
+
+      is_acordado = False
+      if col_acordo and pd.notna(row[col_acordo]):
+        is_acordado = str(row[col_acordo]).strip().lower() in [
+            "sim",
+            "s",
+            "true",
+            "1",
+            "ativo",
+        ]
+
+      num_parc_total = 1
+      parc_feito_txt = (
+          str(row[col_parc_feito])
+          if col_parc_feito and pd.notna(row[col_parc_feito])
+          else "-"
+      )
+      match_parc = re.search(r"(\d+)\s*x", parc_feito_txt, re.IGNORECASE)
+      if match_parc:
+        num_parc_total = int(match_parc.group(1))
+      elif col_num_parc and pd.notna(row[col_num_parc]):
+        v = limpar_valor(row[col_num_parc])
+        if v > 0:
+          num_parc_total = int(v)
+
+      qtd_pagas = 0
+      total_pago = 0.0
+
+      if is_acordado and not df_saidas_mes.empty and col_desc_sai:
+        df_saidas_parc = df_saidas_mes.copy()
+        if not mask_parcelamentos.empty and mask_parcelamentos.any():
+          df_saidas_parc = df_saidas_mes[mask_parcelamentos].copy()
+
+        credor_alvo = credor_nome.strip().lower()
+
+        def match_linha_saida(row_sai):
+          val_desc = (
+              str(row_sai[col_desc_sai]).strip().lower() if col_desc_sai else ""
+          )
+          if not val_desc:
+            return False
+          return (
+              (credor_alvo == val_desc)
+              or (credor_alvo in val_desc)
+              or (val_desc in credor_alvo)
+          )
+
+        df_matches = df_saidas_parc[
+            df_saidas_parc.apply(match_linha_saida, axis=1)
+        ]
+
+        if not df_matches.empty:
+          total_pago = df_matches["Valor_Clean"].sum()
+          qtd_pagas = 0
+
+          for _, r_match in df_matches.iterrows():
+            p_str = (
+                str(r_match[col_parc_sai]).strip()
+                if col_parc_sai and pd.notna(r_match[col_parc_sai])
+                else ""
+            )
+            if "/" in p_str:
+              try:
+                partes = p_str.split("/")
+                p_paga = int(partes[0].strip())
+                p_tot = int(partes[1].strip())
+                if p_paga > 0:
+                  qtd_pagas = max(qtd_pagas, p_paga)
+                if p_tot > 1:
+                  num_parc_total = p_tot
+              except:
+                pass
+          if qtd_pagas == 0:
+            qtd_pagas = len(df_matches)
+
+      if is_acordado and num_parc_total <= 1:
+        num_parc_total = 36
+
+      saldo_restante = max(0.0, val_total - total_pago)
+      faltam_pagar = max(0, num_parc_total - qtd_pagas)
+
+      cor = "#0284C7" if is_acordado else "#FF5722"
+      bg = "#E0F2FE" if is_acordado else "#FEE2E2"
+      status = "Acordado / Parcelado" if is_acordado else "Pendente"
+
+      if is_acordado:
+        detalhes_blocos = (
+            '<div style="flex: 1; min-width: 150px; font-size:0.95rem;'
+            f' color:#334155;"><b>Já pago:</b> {qtd_pagas} parcela(s)<br><span'
+            ' style="color:#10B981;'
+            f' font-weight:700;">{fmt_brl(total_pago)}</span></div><div'
+            ' style="flex: 1; min-width: 150px; font-size:0.95rem;'
+            f' color:#334155;"><b>Falta pagar:</b> {faltam_pagar}'
+            ' parcela(s)<br><span style="color:#FF5722;'
+            f' font-weight:700;">{fmt_brl(saldo_restante)}</span></div>'
+        )
+      else:
+        detalhes_blocos = (
+            '<div style="flex: 2; min-width: 300px; font-size:0.95rem;'
+            ' color:#FF5722; font-weight:600;">Aguardando acordo / negociação'
+            ' para este credor.</div>'
+        )
+
+      html_card_atr = f"""<div style="background:#F8FAFC; padding:18px; border-radius:8px; border:1px solid #CBD5E1; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
 <div style="flex: 1.2; min-width: 250px;">
 <span style="font-weight:800; font-size:1.1rem; color:#0F172A;">{nome_divida}</span><br>
 <span style="font-size:0.85rem; color:#64748B;">Credor: <b>{credor_nome}</b></span><br>
@@ -699,173 +1047,330 @@ Aguardando acordo / negociação para este credor.
 </div>
 {detalhes_blocos}
 </div>"""
-            st.markdown(html_card_atr, unsafe_allow_html=True)
-    else:
-        st.info("Aba 'Dívidas atrasadas' não encontrada ou vazia.")
+      st.markdown(html_card_atr, unsafe_allow_html=True)
+  else:
+    st.info("Aba 'Dívidas atrasadas' não encontrada ou vazia.")
 
 # --- 8. CUSTOS E PARCELAMENTOS ATIVOS ---
 with st.container(border=True):
-    st.markdown('<div class="card-header-navy">✅ CUSTOS / PARCELAMENTOS ATIVOS (POR JANELA)</div>', unsafe_allow_html=True)
+  st.markdown(
+      '<div class="card-header-navy">✅ CUSTOS / PARCELAMENTOS ATIVOS (POR'
+      " JANELA)</div>",
+      unsafe_allow_html=True,
+  )
 
-    if not df_dividas_fixas.empty:
-        col_nome_fixa = obter_coluna_por_termo(df_dividas_fixas, ['nome da dívida', 'nome da divida', 'nome', 'descrição', 'descricao', 'credor'])
-        col_val_fixa = obter_coluna_por_termo(df_dividas_fixas, ['valor (r$)', 'valor']) or obter_coluna_valor_principal(df_dividas_fixas)
-        col_parc_fixa = obter_coluna_por_termo(df_dividas_fixas, ['tem parcelamento?', 'tem parcelamento', 'possui parcelamento', 'parcelamento'])
-        col_num_parc_fixa = obter_coluna_por_termo(df_dividas_fixas, ['quantidade de parcelas', 'quantidade', 'parcelas', 'num', 'nº'])
-        col_inicio_fixa = obter_coluna_por_termo(df_dividas_fixas, ['inicio do pagamento', 'início do pagamento', 'inicio', 'início'])
-        col_fim_fixa = obter_coluna_por_termo(df_dividas_fixas, ['finaliza em', 'finaliza', 'fim', 'término', 'termino'])
-        col_janela_fixa = obter_coluna_por_termo(df_dividas_fixas, ['janela'])
-        
-        salario_fixos = []
-        salario_parcelados = []
-        adiantamento_fixos = []
-        adiantamento_parcelados = []
-        
-        for idx, row in df_dividas_fixas.iterrows():
-            nome_div = str(row[col_nome_fixa]).strip() if col_nome_fixa and pd.notna(row[col_nome_fixa]) else "Desconhecido"
-            if not nome_div or nome_div.lower() == 'nan': continue
-            
-            val_div = limpar_valor(row[col_val_fixa]) if col_val_fixa and pd.notna(row[col_val_fixa]) else 0.0
-            janela = str(row[col_janela_fixa]).lower().strip() if col_janela_fixa and pd.notna(row[col_janela_fixa]) else ""
-            
-            is_parcelado = False
-            if col_parc_fixa and pd.notna(row[col_parc_fixa]):
-                is_parcelado = str(row[col_parc_fixa]).strip().lower() in ['sim', 's', 'true', '1']
-            
-            num_parc_total = 1
-            qtd_parc_str = str(row[col_num_parc_fixa]).strip() if col_num_parc_fixa and pd.notna(row[col_num_parc_fixa]) else "-"
-            match_p = re.search(r'(\d+)', qtd_parc_str)
-            if match_p:
-                num_parc_total = int(match_p.group(1))
+  if not df_dividas_fixas.empty:
+    col_nome_fixa = obter_coluna_por_termo(
+        df_dividas_fixas,
+        [
+            "nome da dívida",
+            "nome da divida",
+            "nome",
+            "descrição",
+            "descricao",
+            "credor",
+        ],
+    )
+    col_val_fixa = obter_coluna_por_termo(
+        df_dividas_fixas, ["valor (r$)", "valor"]
+    ) or obter_coluna_valor_principal(df_dividas_fixas)
+    col_parc_fixa = obter_coluna_por_termo(
+        df_dividas_fixas,
+        ["tem parcelamento?", "tem parcelamento", "possui parcelamento", "parcelamento"],
+    )
+    col_num_parc_fixa = obter_coluna_por_termo(
+        df_dividas_fixas,
+        ["quantidade de parcelas", "quantidade", "parcelas", "num", "nº"],
+    )
+    col_inicio_fixa = obter_coluna_por_termo(
+        df_dividas_fixas,
+        ["inicio do pagamento", "início do pagamento", "inicio", "início"],
+    )
+    col_fim_fixa = obter_coluna_por_termo(
+        df_dividas_fixas, ["finaliza em", "finaliza", "fim", "término", "termino"]
+    )
+    col_janela_fixa = obter_coluna_por_termo(df_dividas_fixas, ["janela"])
 
-            data_inicio = str(row[col_inicio_fixa]).strip() if col_inicio_fixa and pd.notna(row[col_inicio_fixa]) else "-"
-            data_fim = str(row[col_fim_fixa]).strip() if col_fim_fixa and pd.notna(row[col_fim_fixa]) else "-"
+    salario_fixos = []
+    salario_parcelados = []
+    adiantamento_fixos = []
+    adiantamento_parcelados = []
 
-            qtd_pagas = 0
-            p_str_encontrada = ""
-            
-            if is_parcelado and not df_saidas.empty and col_desc_sai:
-                nome_target = nome_div.strip().lower()
-                
-                def match_fixa_saida(row_s):
-                    d_s = str(row_s[col_desc_sai]).strip().lower() if col_desc_sai else ""
-                    if not d_s: return False
-                    return (nome_target in d_s) or (d_s in nome_target)
-                
-                df_m_fixa = df_saidas[df_saidas.apply(match_fixa_saida, axis=1)]
-                if not df_m_fixa.empty:
-                    for _, r_m in df_m_fixa.iterrows():
-                        p_val = str(r_m[col_parc_sai]).strip() if col_parc_sai and pd.notna(r_m[col_parc_sai]) else ""
-                        if '/' in p_val:
-                            try:
-                                pt = p_val.split('/')
-                                curr_p = int(pt[0].strip())
-                                tot_p = int(pt[1].strip())
-                                if curr_p > 0:
-                                    qtd_pagas = max(qtd_pagas, curr_p)
-                                if tot_p > 1:
-                                    num_parc_total = tot_p
-                                p_str_encontrada = p_val
-                            except: pass
-                    if qtd_pagas == 0:
-                        qtd_pagas = len(df_m_fixa)
+    for idx, row in df_dividas_fixas.iterrows():
+      nome_div = (
+          str(row[col_nome_fixa]).strip()
+          if col_nome_fixa and pd.notna(row[col_nome_fixa])
+          else "Desconhecido"
+      )
+      if not nome_div or nome_div.lower() == "nan":
+        continue
 
-            if is_parcelado:
-                if qtd_pagas > 0:
-                    badge_status = f"<span style='color:#10B981; font-weight:700;'>{qtd_pagas} de {num_parc_total} pagas ({p_str_encontrada if p_str_encontrada else f'{qtd_pagas}/{num_parc_total}'})</span>"
-                else:
-                    badge_status = f"<span style='color:#64748B; font-weight:600;'>0 de {num_parc_total} pagas este mês</span>"
+      val_div = (
+          limpar_valor(row[col_val_fixa])
+          if col_val_fixa and pd.notna(row[col_val_fixa])
+          else 0.0
+      )
+      janela = (
+          str(row[col_janela_fixa]).lower().strip()
+          if col_janela_fixa and pd.notna(row[col_janela_fixa])
+          else ""
+      )
 
-                info_parc_html = f"• <b>Quantidade de Parcelas:</b> {qtd_parc_str}<br>• <b>Início do Pagamento:</b> {data_inicio}<br>• <b>Finaliza em:</b> {data_fim}<br>• <b>Status no Mês:</b> {badge_status}"
-            else:
-                info_parc_html = "• <b>Custo Fixo Contínuo</b> (Sem data final)"
-                
-            html_item = f"""<div style="background:#F8FAFC; padding:14px; border-radius:8px; border:1px solid #CBD5E1; margin-bottom:10px;">
+      is_parcelado = False
+      if col_parc_fixa and pd.notna(row[col_parc_fixa]):
+        is_parcelado = str(row[col_parc_fixa]).strip().lower() in [
+            "sim",
+            "s",
+            "true",
+            "1",
+        ]
+
+      num_parc_total = 1
+      qtd_parc_str = (
+          str(row[col_num_parc_fixa]).strip()
+          if col_num_parc_fixa and pd.notna(row[col_num_parc_fixa])
+          else "-"
+      )
+      match_p = re.search(r"(\d+)", qtd_parc_str)
+      if match_p:
+        num_parc_total = int(match_p.group(1))
+
+      data_inicio = (
+          str(row[col_inicio_fixa]).strip()
+          if col_inicio_fixa and pd.notna(row[col_inicio_fixa])
+          else "-"
+      )
+      data_fim = (
+          str(row[col_fim_fixa]).strip()
+          if col_fim_fixa and pd.notna(row[col_fim_fixa])
+          else "-"
+      )
+
+      qtd_pagas = 0
+      p_str_encontrada = ""
+
+      if is_parcelado and not df_saidas_mes.empty and col_desc_sai:
+        nome_target = nome_div.strip().lower()
+
+        def match_fixa_saida(row_s):
+          d_s = str(row_s[col_desc_sai]).strip().lower() if col_desc_sai else ""
+          if not d_s:
+            return False
+          return (nome_target in d_s) or (d_s in nome_target)
+
+        df_m_fixa = df_saidas_mes[
+            df_saidas_mes.apply(match_fixa_saida, axis=1)
+        ]
+        if not df_m_fixa.empty:
+          for _, r_m in df_m_fixa.iterrows():
+            p_val = (
+                str(r_m[col_parc_sai]).strip()
+                if col_parc_sai and pd.notna(r_m[col_parc_sai])
+                else ""
+            )
+            if "/" in p_val:
+              try:
+                pt = p_val.split("/")
+                curr_p = int(pt[0].strip())
+                tot_p = int(pt[1].strip())
+                if curr_p > 0:
+                  qtd_pagas = max(qtd_pagas, curr_p)
+                if tot_p > 1:
+                  num_parc_total = tot_p
+                p_str_encontrada = p_val
+              except:
+                pass
+          if qtd_pagas == 0:
+            qtd_pagas = len(df_m_fixa)
+
+      if is_parcelado:
+        if qtd_pagas > 0:
+          badge_status = (
+              '<span style="color:#10B981; font-weight:700;">'
+              f'{qtd_pagas} de {num_parc_total} pagas ({p_str_encontrada if p_str_encontrada else f"{qtd_pagas}/{num_parc_total}"})</span>'
+          )
+        else:
+          badge_status = (
+              '<span style="color:#64748B; font-weight:600;">0 de'
+              f" {num_parc_total} pagas este mês</span>"
+          )
+
+        info_parc_html = (
+            f"• <b>Quantidade de Parcelas:</b> {qtd_parc_str}<br>• <b>Início do"
+            f" Pagamento:</b> {data_inicio}<br>• <b>Finaliza em:</b>"
+            f" {data_fim}<br>• <b>Status no Mês:</b> {badge_status}"
+        )
+      else:
+        info_parc_html = "• <b>Custo Fixo Contínuo</b> (Sem data final)"
+
+      html_item = f"""<div style="background:#F8FAFC; padding:14px; border-radius:8px; border:1px solid #CBD5E1; margin-bottom:10px;">
 <div style="font-weight:800; font-size:1.05rem; color:#0F172A; margin-bottom:4px;">{nome_div}</div>
 <div style="font-size:0.9rem; color:#334155; line-height:1.5;">
 • <b>Valor (R$):</b> <span style="color:#0F172A; font-weight:700;">{fmt_brl(val_div)}</span><br>
 {info_parc_html}
 </div></div>"""
-            
-            if 'salário' in janela or 'salario' in janela or '05' in janela:
-                if is_parcelado: salario_parcelados.append(html_item)
-                else: salario_fixos.append(html_item)
-            else:
-                if is_parcelado: adiantamento_parcelados.append(html_item)
-                else: adiantamento_fixos.append(html_item)
-                
-        c_fix1, c_fix2 = st.columns(2)
-        with c_fix1:
-            st.markdown("<div style='font-size:1.1rem; font-weight:800; color:#0F172A; margin-bottom:12px; border-bottom:2px solid #10B981; padding-bottom:6px;'>💳 Pagamentos Janela Salário (Dia 05)</div>", unsafe_allow_html=True)
-            
-            if salario_fixos:
-                st.markdown("<div style='font-size:0.95rem; font-weight:700; color:#0F172A; background:#E2E8F0; padding:6px 10px; border-radius:6px; margin-bottom:10px; margin-top:10px;'>🔄 Custos Fixos Contínuos</div>", unsafe_allow_html=True)
-                for it in salario_fixos: st.markdown(it, unsafe_allow_html=True)
-            
-            if salario_parcelados:
-                st.markdown("<div style='font-size:0.95rem; font-weight:700; color:#0F172A; background:#E2E8F0; padding:6px 10px; border-radius:6px; margin-bottom:10px; margin-top:15px;'>🔢 Parcelamentos Ativos</div>", unsafe_allow_html=True)
-                for it in salario_parcelados: st.markdown(it, unsafe_allow_html=True)
 
-            if not salario_fixos and not salario_parcelados:
-                st.write("Sem registros para esta janela.")
-                
-        with c_fix2:
-            st.markdown("<div style='font-size:1.1rem; font-weight:800; color:#0F172A; margin-bottom:12px; border-bottom:2px solid #0284C7; padding-bottom:6px;'>💳 Pagamentos Janela Adiantamento (Dia 15)</div>", unsafe_allow_html=True)
-            
-            if adiantamento_fixos:
-                st.markdown("<div style='font-size:0.95rem; font-weight:700; color:#0F172A; background:#E2E8F0; padding:6px 10px; border-radius:6px; margin-bottom:10px; margin-top:10px;'>🔄 Custos Fixos Contínuos</div>", unsafe_allow_html=True)
-                for it in adiantamento_fixos: st.markdown(it, unsafe_allow_html=True)
-            
-            if adiantamento_parcelados:
-                st.markdown("<div style='font-size:0.95rem; font-weight:700; color:#0F172A; background:#E2E8F0; padding:6px 10px; border-radius:6px; margin-bottom:10px; margin-top:15px;'>🔢 Parcelamentos Ativos</div>", unsafe_allow_html=True)
-                for it in adiantamento_parcelados: st.markdown(it, unsafe_allow_html=True)
+      if "salário" in janela or "salario" in janela or "05" in janela:
+        if is_parcelado:
+          salario_parcelados.append(html_item)
+        else:
+          salario_fixos.append(html_item)
+      else:
+        if is_parcelado:
+          adiantamento_parcelados.append(html_item)
+        else:
+          adiantamento_fixos.append(html_item)
 
-            if not adiantamento_fixos and not adiantamento_parcelados:
-                st.write("Sem registros para esta janela.")
-    else:
-        st.info("Aba 'Custos/parcelamentos ativos' não encontrada ou vazia.")
+    c_fix1, c_fix2 = st.columns(2)
+    with c_fix1:
+      st.markdown(
+          "<div style='font-size:1.1rem; font-weight:800; color:#0F172A;"
+          " margin-bottom:12px; border-bottom:2px solid #10B981;"
+          " padding-bottom:6px;'>💳 Pagamentos Janela Salário (Dia 05)</div>",
+          unsafe_allow_html=True,
+      )
+
+      if salario_fixos:
+        st.markdown(
+            "<div style='font-size:0.95rem; font-weight:700; color:#0F172A;"
+            " background:#E2E8F0; padding:6px 10px; border-radius:6px;"
+            " margin-bottom:10px; margin-top:10px;'>🔄 Custos Fixos"
+            " Contínuos</div>",
+            unsafe_allow_html=True,
+        )
+        for it in salario_fixos:
+          st.markdown(it, unsafe_allow_html=True)
+
+      if salario_parcelados:
+        st.markdown(
+            "<div style='font-size:0.95rem; font-weight:700; color:#0F172A;"
+            " background:#E2E8F0; padding:6px 10px; border-radius:6px;"
+            " margin-bottom:10px; margin-top:15px;'>🔢 Parcelamentos"
+            " Ativos</div>",
+            unsafe_allow_html=True,
+        )
+        for it in salario_parcelados:
+          st.markdown(it, unsafe_allow_html=True)
+
+      if not salario_fixos and not salario_parcelados:
+        st.write("Sem registros para esta janela.")
+
+    with c_fix2:
+      st.markdown(
+          "<div style='font-size:1.1rem; font-weight:800; color:#0F172A;"
+          " margin-bottom:12px; border-bottom:2px solid #0284C7;"
+          " padding-bottom:6px;'>💳 Pagamentos Janela Adiantamento (Dia"
+          " 15)</div>",
+          unsafe_allow_html=True,
+      )
+
+      if adiantamento_fixos:
+        st.markdown(
+            "<div style='font-size:0.95rem; font-weight:700; color:#0F172A;"
+            " background:#E2E8F0; padding:6px 10px; border-radius:6px;"
+            " margin-bottom:10px; margin-top:10px;'>🔄 Custos Fixos"
+            " Contínuos</div>",
+            unsafe_allow_html=True,
+        )
+        for it in adiantamento_fixos:
+          st.markdown(it, unsafe_allow_html=True)
+
+      if adiantamento_parcelados:
+        st.markdown(
+            "<div style='font-size:0.95rem; font-weight:700; color:#0F172A;"
+            " background:#E2E8F0; padding:6px 10px; border-radius:6px;"
+            " margin-bottom:10px; margin-top:15px;'>🔢 Parcelamentos"
+            " Ativos</div>",
+            unsafe_allow_html=True,
+        )
+        for it in adiantamento_parcelados:
+          st.markdown(it, unsafe_allow_html=True)
+
+      if not adiantamento_fixos and not adiantamento_parcelados:
+        st.write("Sem registros para esta janela.")
+  else:
+    st.info("Aba 'Custos/parcelamentos ativos' não encontrada ou vazia.")
 
 # --- 9. INSIGHTS EXCLUSIVOS DA SUA ASSISTENTE (ÂNCORA #insights) ---
 st.markdown('<div id="insights"></div>', unsafe_allow_html=True)
 with st.container(border=True):
-    st.markdown('<div class="card-header-navy">💡 INSIGHTS DA SUA ASSISTENTE PESSOAL</div>', unsafe_allow_html=True)
+  st.markdown(
+      '<div class="card-header-navy">💡 INSIGHTS DA SUA ASSISTENTE'
+      " PESSOAL</div>",
+      unsafe_allow_html=True,
+  )
 
-    if not df_saidas.empty and total_saidas_pix > 0:
-        try:
-            cols_tg = [c for c in df_saidas.columns if any(p in c.lower() for p in ['tipo de gasto', 'categoria'])]
-            col_tg = cols_tg[0] if cols_tg else df_saidas.columns[1]
+  if not df_saidas_mes.empty and total_saidas_pix > 0:
+    try:
+      cols_tg = [
+          c
+          for c in df_saidas_mes.columns
+          if any(p in c.lower() for p in ["tipo de gasto", "categoria"])
+      ]
+      col_tg = cols_tg[0] if cols_tg else df_saidas_mes.columns[1]
 
-            df_tree = df_saidas.groupby(col_tg)['Valor_Clean'].sum().reset_index()
-            total_gasto_geral = df_tree['Valor_Clean'].sum()
-            df_tree['Porcentagem'] = (df_tree['Valor_Clean'] / total_gasto_geral) * 100
+      df_tree = (
+          df_saidas_mes.groupby(col_tg)["Valor_Clean"].sum().reset_index()
+      )
+      total_gasto_geral = df_tree["Valor_Clean"].sum()
+      df_tree["Porcentagem"] = (
+          df_tree["Valor_Clean"] / total_gasto_geral
+      ) * 100
 
-            maior_cat_row = df_tree.loc[df_tree['Valor_Clean'].idxmax()]
-            maior_categoria = maior_cat_row[col_tg]
-            maior_valor = maior_cat_row['Valor_Clean']
-            pct_maior = maior_cat_row['Porcentagem']
+      maior_cat_row = df_tree.loc[df_tree["Valor_Clean"].idxmax()]
+      maior_categoria = maior_cat_row[col_tg]
+      maior_valor = maior_cat_row["Valor_Clean"]
+      pct_maior = maior_cat_row["Porcentagem"]
 
-            if pct_gasto_total <= 60 and dia_atual <= 15:
-                status_mes_bottom = "🟢 <b style='color:#10B981;'>Mês sob controle!</b> Estamos no início do mês e os gastos estão bem moderados. Excelente ritmo de economia!"
-            elif pct_gasto_total > 75 or (pct_gasto_total > 50 and dia_atual <= 10):
-                status_mes_bottom = "🔴 <b style='color:#FF5722;'>Alerta Vermelho!</b> Estamos na primeira quinzena e uma grande parte da sua receita já foi comprometida. Sugiro pisar no freio nas despesas variáveis."
-            elif pct_gasto_total >= 90:
-                status_mes_bottom = "🔴 <b style='color:#FF5722;'>Orçamento no Limite!</b> Você está gastando quase tudo que entrou. Evite qualquer compra não essencial agora."
-            elif pct_gasto_total < 80 and dia_atual > 15:
-                status_mes_bottom = "🟢 <b style='color:#10B981;'>Bom progresso!</b> Passamos da metade do mês com uma boa margem de respiro financeiro na conta."
-            else:
-                status_mes_bottom = "🟡 <b style='color:#F59E0B;'>Atenção Moderada.</b> Os gastos estão acompanhando os dias do mês proporcionalmente. Fique de olho para garantirmos o fechamento no azul."
+      if pct_gasto_total <= 60 and dia_atual <= 15:
+        status_mes_bottom = (
+            "🟢 <b style='color:#10B981;'>Mês sob controle!</b> Estamos no início"
+            " do mês e os gastos estão bem moderados. Excelente ritmo de"
+            " economia!"
+        )
+      elif pct_gasto_total > 75 or (
+          pct_gasto_total > 50 and dia_atual <= 10
+      ):
+        status_mes_bottom = (
+            "🔴 <b style='color:#FF5722;'>Alerta Vermelho!</b> Estamos na"
+            " primeira quinzena e uma grande parte da sua receita já foi"
+            " comprometida. Sugiro pisar no freio nas despesas variáveis."
+        )
+      elif pct_gasto_total >= 90:
+        status_mes_bottom = (
+            "🔴 <b style='color:#FF5722;'>Orçamento no Limite!</b> Você está"
+            " gastando quase tudo que entrou. Evite qualquer compra não"
+            " essencial agora."
+        )
+      elif pct_gasto_total < 80 and dia_atual > 15:
+        status_mes_bottom = (
+            "🟢 <b style='color:#10B981;'>Bom progresso!</b> Passamos da metade"
+            " do mês com uma boa margem de respiro financeiro na conta."
+        )
+      else:
+        status_mes_bottom = (
+            "🟡 <b style='color:#F59E0B;'>Atenção Moderada.</b> Os gastos estão"
+            " acompanhando os dias do mês proporcionalmente. Fique de olho"
+            " para garantirmos o fechamento no azul."
+        )
 
-            st.markdown(f"""
+      st.markdown(
+          f"""
             <div style="background:#F8FAFC; padding:22px; border-radius:10px; border:1px solid #CBD5E1; border-left:6px solid #0F172A;">
                 <div style="font-size:1.15rem; font-weight:800; color:#0F172A; margin-bottom:10px;">Aqui está sua análise financeira detalhada 🙋‍♀️</div>
                 <div style="font-size:0.95rem; color:#334155; line-height:1.7;">
-                    Analisando suas movimentações até hoje (dia {dia_atual}), identifiquei que o seu maior volume de despesas está concentrado na categoria <b>{maior_categoria}</b>, que consumiu <b>{pct_maior:.1f}%</b> dos seus gastos totais até aqui (<b>{fmt_brl(maior_valor)}</b>).<br><br>
+                    Analisando suas movimentações até hoje no mês de <b>{mes_selecionado.upper()}/{ano_selecionado}</b>, identifiquei que o seu maior volume de despesas está concentrado na categoria <b>{maior_categoria}</b>, que consumiu <b>{pct_maior:.1f}%</b> dos seus gastos totais até aqui (<b>{fmt_brl(maior_valor)}</b>).<br><br>
                     <b>Diagnóstico do Período:</b> {status_mes_bottom}<br><br>
                     <i style="color:#64748B; font-size:0.85rem;">Obs: Como o mês está em andamento, esta análise se atualiza automaticamente conforme você insere novos pagamentos na planilha.</i>
                 </div>
             </div>
-            """, unsafe_allow_html=True)
-        except Exception as e:
-            st.write("Processando insights de saídas...", e)
-    else:
-        st.info("Aguardando lançamentos na aba Saídas para compilar seus insights do mês...")
+            """,
+          unsafe_allow_html=True,
+      )
+    except Exception as e:
+      st.write("Processando insights de saídas...", e)
+  else:
+    st.info(
+        "Aguardando lançamentos na aba Saídas para compilar seus insights"
+        f" do mês de {mes_selecionado.upper()}/{ano_selecionado}..."
+    )
