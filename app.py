@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
-import plotly.graph_objects as go  # Adicionado para o gráfico de ponteiro (Gauge) da viagem
+import plotly.graph_objects as go
 import urllib.parse
 import re
 import base64
@@ -72,16 +72,6 @@ st.markdown("""
 
     .card-header-orange {
         background: linear-gradient(90deg, #FF5722 0%, #E64A19 100%);
-        color: #FFFFFF;
-        padding: 14px 24px;
-        font-weight: 700;
-        font-size: 1rem;
-        text-transform: uppercase;
-        margin: -24px -28px 24px -28px;
-    }
-    
-    .card-header-blue {
-        background: linear-gradient(90deg, #0284C7 0%, #0369A1 100%);
         color: #FFFFFF;
         padding: 14px 24px;
         font-weight: 700;
@@ -210,7 +200,9 @@ df_dividas_atrasadas = carregar_aba(["Dividas atrasadas", "Dívidas Atrasadas", 
 df_dividas_fixas = carregar_aba(["Custos/parcelamentos ativos", "Custos e parcelamentos ativos", "Custos Ativos", "Dividas Fixas", "Dívidas Fixas", "Parcelamentos Fixos"])
 df_entradas = carregar_aba(["Entradas", "Entradas Agosto"])
 df_saidas = carregar_aba(["Saídas", "Saidas"])
-df_viagem = carregar_aba(["Caixinha Viagem", "Viagem", "Caixinha"])
+
+# Carregamento específico para Caixinha Viagem
+df_viagem = carregar_aba(["Caixinha Viagem", "Caixinha viagem", "Viagem"])
 
 # --- PROCESSAMENTO PRÉVIO ---
 col_desc_sai = obter_coluna_por_termo(df_saidas, ['descrição do gasto', 'descrição', 'descricao'])
@@ -505,21 +497,23 @@ with st.container(border=True):
         else:
             st.write("Nenhum abastecimento registrado neste mês.")
 
-# --- 5. CAIXINHA DE VIAGEM (NOVO) ---
+# --- 5. CAIXINHA DE VIAGEM ---
 total_guardado_viagem = 0.0
 meta_viagem = 4000.0
 
 if not df_viagem.empty:
-    col_valor_viagem = obter_coluna_por_termo(df_viagem, ['quantidade', 'guardada', 'valor'])
+    col_valor_viagem = obter_coluna_por_termo(df_viagem, ['quantidade guardada', 'quantidade', 'guardada', 'valor'])
     if col_valor_viagem:
-        df_viagem['Valor_Clean'] = df_viagem[col_valor_viagem].apply(limpar_valor)
-        total_guardado_viagem = df_viagem['Valor_Clean'].sum()
+        # Garante leitura filtrada sem puxar aba errada
+        val_series = df_viagem[col_valor_viagem].apply(limpar_valor)
+        if not val_series.empty and len(df_viagem) < 100:  # Trava de segurança para não somar abas grandes acidentalmente
+            total_guardado_viagem = val_series.sum()
 
-pct_viagem = min((total_guardado_viagem / meta_viagem) * 100, 100)
+pct_viagem = min((total_guardado_viagem / meta_viagem) * 100, 100) if meta_viagem > 0 else 0
 falta_viagem = max(meta_viagem - total_guardado_viagem, 0)
 
 with st.container(border=True):
-    st.markdown('<div class="card-header-blue" style="background: linear-gradient(90deg, #0284C7 0%, #0369A1 100%); color: #FFFFFF; padding: 14px 24px; font-weight: 700; font-size: 1rem; text-transform: uppercase; margin: -24px -28px 24px -28px;">✈️ CAIXINHA DE VIAGEM (BAHIA COM O LUCCA)</div>', unsafe_allow_html=True)
+    st.markdown('<div class="card-header-orange" style="background: linear-gradient(90deg, #0284C7 0%, #0369A1 100%); color: #FFFFFF; padding: 14px 24px; font-weight: 700; font-size: 1rem; text-transform: uppercase; margin: -24px -28px 24px -28px;">✈️ CAIXINHA DE VIAGEM (BAHIA COM O LUCCA)</div>', unsafe_allow_html=True)
     
     c_v1, c_v2 = st.columns([1.2, 1])
     
@@ -563,7 +557,6 @@ with st.container(border=True):
         ))
         fig_gauge.update_layout(height=220, margin=dict(l=20, r=20, t=40, b=20), paper_bgcolor='rgba(0,0,0,0)')
         st.plotly_chart(fig_gauge, use_container_width=True, config={'displayModeBar': False})
-
 
 # --- 6. RECEITA OPERACIONAL ---
 with st.container(border=True):
