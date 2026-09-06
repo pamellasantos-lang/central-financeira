@@ -79,6 +79,16 @@ st.markdown("""
         text-transform: uppercase;
         margin: -24px -28px 24px -28px;
     }
+    
+    .card-header-blue {
+        background: linear-gradient(90deg, #0284C7 0%, #0369A1 100%);
+        color: #FFFFFF;
+        padding: 14px 24px;
+        font-weight: 700;
+        font-size: 1rem;
+        text-transform: uppercase;
+        margin: -24px -28px 24px -28px;
+    }
 
     .kpi-card-box {
         background: #F8FAFC;
@@ -93,7 +103,7 @@ st.markdown("""
     .kpi-card-blue { border-left-color: #0284C7; }
 
     .kpi-title { font-size: 0.85rem; font-weight: 700; color: #64748B; text-transform: uppercase; margin-bottom: 6px; }
-    .kpi-value-main { font-size: 1.8rem !important; font-weight: 800 !important; line-height: 1.2 !important; }
+    .kpi-value-main { font-size: 1.8rem; font-weight: 800; line-height: 1.2; }
     .kpi-subtext { font-size: 0.85rem; font-weight: 600; color: #64748B; margin-top: 4px; }
     
     /* AVATAR EXPANDIDO E CENTRALIZADO */
@@ -340,10 +350,10 @@ with st.container(border=True):
 with st.container(border=True):
     st.markdown('<div class="card-header-navy">📊 RESUMO EXECUTIVO GERAL</div>', unsafe_allow_html=True)
     c1, c2, c3, c4 = st.columns(4)
-    with c1: st.markdown(f'<div class="kpi-card-box kpi-card-blue"><div class="kpi-title">Total Entradas PIX</div><div class="kpi-value-main" style="font-size: 1.8rem !important; font-weight: 800 !important; color:#0284C7 !important; margin: 4px 0;">{fmt_brl(total_entradas_pix)}</div><div class="kpi-subtext">Salário + Adiantamento</div></div>', unsafe_allow_html=True)
-    with c2: st.markdown(f'<div class="kpi-card-box kpi-card-blue"><div class="kpi-title">Total Entradas VR</div><div class="kpi-value-main" style="font-size: 1.8rem !important; font-weight: 800 !important; color:#0369A1 !important; margin: 4px 0;">{fmt_brl(total_entradas_vr)}</div><div class="kpi-subtext">Cartão Flash Exclusivo</div></div>', unsafe_allow_html=True)
-    with c3: st.markdown(f'<div class="kpi-card-box kpi-card-orange"><div class="kpi-title">Total Saídas PIX</div><div class="kpi-value-main" style="font-size: 1.8rem !important; font-weight: 800 !important; color:#FF5722 !important; margin: 4px 0;">{fmt_brl(total_saidas_pix)}</div><div class="kpi-subtext">Todos os gastos em conta</div></div>', unsafe_allow_html=True)
-    with c4: st.markdown(f'<div class="kpi-card-box kpi-card-green"><div class="kpi-title">Sobra do Mês</div><div class="kpi-value-main" style="font-size: 1.8rem !important; font-weight: 800 !important; color:#10B981 !important; margin: 4px 0;">{fmt_brl(sobra_liquida)}</div><div class="kpi-subtext">Entradas PIX - Saídas PIX</div></div>', unsafe_allow_html=True)
+    with c1: st.markdown(f'<div class="kpi-card-box kpi-card-blue"><div class="kpi-title">Total Entradas PIX</div><div class="kpi-value-main" style="color:#0284C7; margin: 4px 0;">{fmt_brl(total_entradas_pix)}</div><div class="kpi-subtext">Salário + Adiantamento</div></div>', unsafe_allow_html=True)
+    with c2: st.markdown(f'<div class="kpi-card-box kpi-card-blue"><div class="kpi-title">Total Entradas VR</div><div class="kpi-value-main" style="color:#0369A1; margin: 4px 0;">{fmt_brl(total_entradas_vr)}</div><div class="kpi-subtext">Cartão Flash Exclusivo</div></div>', unsafe_allow_html=True)
+    with c3: st.markdown(f'<div class="kpi-card-box kpi-card-orange"><div class="kpi-title">Total Saídas PIX</div><div class="kpi-value-main" style="color:#FF5722; margin: 4px 0;">{fmt_brl(total_saidas_pix)}</div><div class="kpi-subtext">Todos os gastos em conta</div></div>', unsafe_allow_html=True)
+    with c4: st.markdown(f'<div class="kpi-card-box kpi-card-green"><div class="kpi-title">Sobra do Mês</div><div class="kpi-value-main" style="color:#10B981; margin: 4px 0;">{fmt_brl(sobra_liquida)}</div><div class="kpi-subtext">Entradas PIX - Saídas PIX</div></div>', unsafe_allow_html=True)
 
 # --- 2. DETALHAMENTO DE ENTRADAS, SAÍDAS E SOBRAS ---
 with st.container(border=True):
@@ -502,12 +512,12 @@ total_guardado_viagem = 0.0
 meta_viagem = 4000.0
 
 if not df_viagem.empty:
-    col_valor_viagem = obter_coluna_por_termo(df_viagem, ['quantidade guardada', 'quantidade', 'guardada', 'valor'])
-    if col_valor_viagem:
-        # Garante leitura filtrada sem puxar aba errada
-        val_series = df_viagem[col_valor_viagem].apply(limpar_valor)
-        if not val_series.empty and len(df_viagem) < 100:  # Trava de segurança para não somar abas grandes acidentalmente
-            total_guardado_viagem = val_series.sum()
+    cols_viagem_str = ' '.join([str(c).lower() for c in df_viagem.columns])
+    # Validação estrita: Se tiver colunas de dívidas ou outras abas, desconsidera o fallback do Sheets
+    if 'credor' not in cols_viagem_str and 'janela' not in cols_viagem_str:
+        col_valor_viagem = obter_coluna_por_termo(df_viagem, ['quantidade guardada', 'quantidade', 'guardada'])
+        if col_valor_viagem:
+            total_guardado_viagem = df_viagem[col_valor_viagem].apply(limpar_valor).sum()
 
 pct_viagem = min((total_guardado_viagem / meta_viagem) * 100, 100) if meta_viagem > 0 else 0
 falta_viagem = max(meta_viagem - total_guardado_viagem, 0)
