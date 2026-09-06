@@ -107,7 +107,7 @@ st.markdown("""
         transition: all 0.3s ease;
     }
     
-    /* BALÃO DE FALA ESTILO HQ (BRANCO SEM CINZA) */
+    /* BALÃO DE FALA ESTILO HQ */
     .speech-bubble {
         position: relative;
         background: #FFFFFF;
@@ -121,52 +121,25 @@ st.markdown("""
         display: inline-block;
         width: 100%;
     }
-    
-    /* Ponta do Balão direcionada à assistente */
     .speech-bubble::after {
-        content: '';
-        position: absolute;
-        left: -10px;
-        top: 22px;
-        width: 0;
-        height: 0;
-        border-top: 8px solid transparent;
-        border-bottom: 8px solid transparent;
-        border-right: 10px solid #FFFFFF;
+        content: ''; position: absolute; left: -10px; top: 22px; width: 0; height: 0;
+        border-top: 8px solid transparent; border-bottom: 8px solid transparent; border-right: 10px solid #FFFFFF;
     }
     .speech-bubble::before {
-        content: '';
-        position: absolute;
-        left: -13px;
-        top: 21px;
-        width: 0;
-        height: 0;
-        border-top: 9px solid transparent;
-        border-bottom: 9px solid transparent;
-        border-right: 11px solid #CBD5E1;
+        content: ''; position: absolute; left: -13px; top: 21px; width: 0; height: 0;
+        border-top: 9px solid transparent; border-bottom: 9px solid transparent; border-right: 11px solid #CBD5E1;
     }
     
-    /* BOTÕES DE MÊS COMPACTOS - AJUSTADOS PARA NÃO SOBREPOR DEZEMBRO */
+    /* BOTÕES DE MÊS COMPACTOS */
     div[data-testid="stRadio"] > div { 
-        flex-direction: row !important; 
-        flex-wrap: nowrap !important; 
-        gap: 2px !important; 
-        justify-content: flex-start !important; 
-        align-items: center !important;
+        flex-direction: row !important; flex-wrap: nowrap !important; gap: 2px !important; 
+        justify-content: flex-start !important; align-items: center !important;
     }
     div[data-testid="stRadio"] div[role="radiogroup"] > label { 
-        background-color: #F8FAFC !important; 
-        border: 1px solid #CBD5E1 !important; 
-        padding: 3px 5px !important; 
-        border-radius: 6px !important; 
-        cursor: pointer !important; 
-        font-weight: 700 !important; 
-        font-size: 0.75rem !important; 
-        color: #334155 !important;
-        white-space: nowrap !important;
-        text-align: center !important;
-        min-width: auto !important;
-        margin: 0px !important;
+        background-color: #F8FAFC !important; border: 1px solid #CBD5E1 !important; 
+        padding: 3px 5px !important; border-radius: 6px !important; cursor: pointer !important; 
+        font-weight: 700 !important; font-size: 0.75rem !important; color: #334155 !important;
+        white-space: nowrap !important; text-align: center !important; min-width: auto !important; margin: 0px !important;
     }
     div[data-testid="stRadio"] div[role="radiogroup"] > label > div:first-child { display: none !important; }
     div[data-testid="stRadio"] div[role="radiogroup"] > label[data-checked="true"] { 
@@ -200,8 +173,7 @@ def obter_coluna_por_termo(df, termos):
     if df.empty: return None
     for t in termos:
         for c in df.columns:
-            if t in c.lower():
-                return c
+            if t in c.lower(): return c
     return None
 
 def obter_coluna_data_fim(df):
@@ -228,16 +200,16 @@ df_dividas_fixas = carregar_aba(["Custos/parcelamentos ativos", "Custos e parcel
 df_entradas = carregar_aba(["Entradas", "Entradas Agosto"])
 df_saidas = carregar_aba(["Saídas", "Saidas"])
 
-# --- PROCESSAMENTO PRÉVIO PARA O SEMÁFORO DO TOPO ---
+# --- PROCESSAMENTO PRÉVIO ---
 col_desc_sai = obter_coluna_por_termo(df_saidas, ['descrição do gasto', 'descrição', 'descricao'])
 col_parc_sai = obter_coluna_por_termo(df_saidas, ['parcelamento', 'parcela'])
 col_tipo_gasto_sai = obter_coluna_por_termo(df_saidas, ['tipo de gasto', 'categoria'])
 col_tipo_pag_sai = obter_coluna_por_termo(df_saidas, ['tipo de pagamento', 'pagamento', 'meio', 'forma'])
 col_val_sai = obter_coluna_valor_principal(df_saidas)
+col_data = obter_coluna_por_termo(df_saidas, ['data'])
 
 if not df_saidas.empty and col_val_sai:
     df_saidas['Valor_Clean'] = df_saidas[col_val_sai].apply(limpar_valor)
-    col_data = obter_coluna_por_termo(df_saidas, ['data'])
     if col_data:
         df_saidas['Dia'] = pd.to_datetime(df_saidas[col_data], format='%d/%m/%Y', errors='coerce').dt.day
         df_saidas['Dia'] = df_saidas['Dia'].fillna(1)
@@ -309,41 +281,39 @@ sobra_adiantamento = entradas_adiantamento_pix - saidas_adiantamento_pix
 # --- CALCULO DO DIAGNÓSTICO DO SEMÁFORO DA ASSISTENTE ---
 pct_gasto_total = (total_saidas_pix / total_entradas_pix) * 100 if total_entradas_pix > 0 else 100
 dia_atual = datetime.now().day
+if dia_atual == 0: dia_atual = 1
 
 if pct_gasto_total <= 60 and dia_atual <= 15:
-    cor_semaforo = "#10B981"  # Verde
+    cor_semaforo = "#10B981"
     border_semaforo = "#10B981"
     status_texto = "🟢 Mês sob controle!"
     assistente_expressao = "Tudo dentro do planejado! 😊"
     avatar_file = "assistente_feliz.png"
 elif pct_gasto_total > 75 or (pct_gasto_total > 50 and dia_atual <= 10):
-    cor_semaforo = "#FF5722"  # Vermelho
+    cor_semaforo = "#FF5722"
     border_semaforo = "#FF5722"
     status_texto = "🔴 Alerta de Gastos!"
     assistente_expressao = "Hora de pisar no freio! 😟"
     avatar_file = "assistente_triste.png"
 else:
-    cor_semaforo = "#F59E0B"  # Amarelo
+    cor_semaforo = "#F59E0B"
     border_semaforo = "#F59E0B"
     status_texto = "🟡 Atenção ao orçamento!"
     assistente_expressao = "Vamos monitorar com cuidado. 😐"
     avatar_file = "assistente_atenta.png"
 
-# Carrega a imagem da Assistente Dinamicamente
 img_base64 = get_image_base64(avatar_file)
 avatar_src = f"data:image/png;base64,{img_base64}" if img_base64 else "https://cdn-icons-png.flaticon.com/512/4140/4140048.png"
 
-# --- HEADER REORGANIZADO E COMPACTADO ---
+# --- HEADER REORGANIZADO ---
 with st.container(border=True):
     col_av, col_content = st.columns([1.3, 7.7])
-    
     with col_av:
         st.markdown(f"""
         <div style="display: flex; justify-content: center; align-items: center; height: 100%; padding-top: 5px;">
             <img src="{avatar_src}" class="avatar-frame" style="border: 5px solid {border_semaforo};" alt="Avatar da Assistente">
         </div>
         """, unsafe_allow_html=True)
-        
     with col_content:
         st.markdown(f"""
         <h2 style='margin:0; padding-top:0px; font-size:1.65rem; font-weight:800; color:#0F172A;'>CONTROLE FINANCEIRO <span style='color:#FF5722;'>PAMELLA</span></h2>
@@ -354,9 +324,7 @@ with st.container(border=True):
             </span>
         </div>
         """, unsafe_allow_html=True)
-        
         st.markdown("<div style='margin-top: 8px;'></div>", unsafe_allow_html=True)
-        
         c_ano, c_mes = st.columns([0.95, 8.05])
         with c_ano:
             ano_selecionado = st.selectbox("Ano", [2026, 2027], index=0, label_visibility="collapsed")
@@ -368,12 +336,12 @@ with st.container(border=True):
 with st.container(border=True):
     st.markdown('<div class="card-header-navy">📊 RESUMO EXECUTIVO GERAL</div>', unsafe_allow_html=True)
     c1, c2, c3, c4 = st.columns(4)
-    with c1: st.markdown(f'<div class="kpi-card-box kpi-card-blue"><div class="kpi-title">Total Entradas PIX</div><div class="kpi-value-main" style="font-size: 1.8rem; font-weight: 800; color:#0284C7; margin: 4px 0;">{fmt_brl(total_entradas_pix)}</div><div class="kpi-subtext">Salário + Adiantamento</div></div>', unsafe_allow_html=True)
-    with c2: st.markdown(f'<div class="kpi-card-box kpi-card-blue"><div class="kpi-title">Total Entradas VR</div><div class="kpi-value-main" style="font-size: 1.8rem; font-weight: 800; color:#0369A1; margin: 4px 0;">{fmt_brl(total_entradas_vr)}</div><div class="kpi-subtext">Cartão Flash Exclusivo</div></div>', unsafe_allow_html=True)
-    with c3: st.markdown(f'<div class="kpi-card-box kpi-card-orange"><div class="kpi-title">Total Saídas PIX</div><div class="kpi-value-main" style="font-size: 1.8rem; font-weight: 800; color:#FF5722; margin: 4px 0;">{fmt_brl(total_saidas_pix)}</div><div class="kpi-subtext">Todos os gastos em conta</div></div>', unsafe_allow_html=True)
-    with c4: st.markdown(f'<div class="kpi-card-box kpi-card-green"><div class="kpi-title">Sobra do Mês</div><div class="kpi-value-main" style="font-size: 1.8rem; font-weight: 800; color:#10B981; margin: 4px 0;">{fmt_brl(sobra_liquida)}</div><div class="kpi-subtext">Entradas PIX - Saídas PIX</div></div>', unsafe_allow_html=True)
+    with c1: st.markdown(f'<div class="kpi-card-box kpi-card-blue"><div class="kpi-title">Total Entradas PIX</div><div class="kpi-value-main" style="color:#0284C7; margin: 4px 0;">{fmt_brl(total_entradas_pix)}</div><div class="kpi-subtext">Salário + Adiantamento</div></div>', unsafe_allow_html=True)
+    with c2: st.markdown(f'<div class="kpi-card-box kpi-card-blue"><div class="kpi-title">Total Entradas VR</div><div class="kpi-value-main" style="color:#0369A1; margin: 4px 0;">{fmt_brl(total_entradas_vr)}</div><div class="kpi-subtext">Cartão Flash Exclusivo</div></div>', unsafe_allow_html=True)
+    with c3: st.markdown(f'<div class="kpi-card-box kpi-card-orange"><div class="kpi-title">Total Saídas PIX</div><div class="kpi-value-main" style="color:#FF5722; margin: 4px 0;">{fmt_brl(total_saidas_pix)}</div><div class="kpi-subtext">Todos os gastos em conta</div></div>', unsafe_allow_html=True)
+    with c4: st.markdown(f'<div class="kpi-card-box kpi-card-green"><div class="kpi-title">Sobra do Mês</div><div class="kpi-value-main" style="color:#10B981; margin: 4px 0;">{fmt_brl(sobra_liquida)}</div><div class="kpi-subtext">Entradas PIX - Saídas PIX</div></div>', unsafe_allow_html=True)
 
-# --- 2. DETALHAMENTO DE ENTRADAS, SAÍDAS E SOBRAS POR JANELA DE PAGAMENTO (PIX) ---
+# --- 2. DETALHAMENTO DE ENTRADAS, SAÍDAS E SOBRAS ---
 with st.container(border=True):
     st.markdown('<div class="card-header-navy">📅 DETALHAMENTO DE ENTRADAS, SAÍDAS E SOBRAS POR JANELA DE PAGAMENTO (PIX)</div>', unsafe_allow_html=True)
     cj1, cj2 = st.columns(2)
@@ -398,10 +366,9 @@ with st.container(border=True):
         </div>
         """, unsafe_allow_html=True)
 
-# --- 3. CAIXINHA DE ESSENCIAIS (RESERVA OBRIGATÓRIA MENSAL) ---
+# --- 3. CAIXINHA DE ESSENCIAIS ---
 caixinha_gasolina = 400.00
 caixinha_lucca = 480.00
-
 gasto_gas_tot = gasto_gasolina_vr + gasto_gasolina_pix
 pct_gas = min(100.0, (gasto_gas_tot / caixinha_gasolina) * 100) if caixinha_gasolina > 0 else 0
 gasto_lucca_tot = gasto_lucca_vr + gasto_lucca_pix
@@ -447,17 +414,99 @@ with st.container(border=True):
         </div>
         """, unsafe_allow_html=True)
 
-# --- 4. RECEITA OPERACIONAL EM CONTA & JANELAS DE PAGAMENTO ---
+# --- 4. NOVO: RAIO-X DO COMBUSTÍVEL ---
+with st.container(border=True):
+    st.markdown('<div class="card-header-navy">⛽ RAIO-X DO COMBUSTÍVEL E CONSUMO</div>', unsafe_allow_html=True)
+    
+    c_gas_in, c_gas_kpi, c_gas_time = st.columns([1, 1.2, 1.8])
+    
+    with c_gas_in:
+        st.markdown("<div style='font-size:0.95rem; font-weight:700; color:#0F172A; margin-bottom:8px;'>⚙️ Seus Parâmetros</div>", unsafe_allow_html=True)
+        preco_gasolina = st.number_input("Preço Médio (R$/Litro)", value=5.80, step=0.10, format="%.2f")
+        km_diario = st.number_input("Média rodada (KM/dia)", value=30, step=1)
+        
+    with c_gas_kpi:
+        # Cálculos de estimativa
+        litros_est = gasto_gas_tot / preco_gasolina if preco_gasolina > 0 else 0
+        km_rodado_est = km_diario * dia_atual
+        kml_est = km_rodado_est / litros_est if litros_est > 0 else 0
+        
+        st.markdown(f"""
+        <div style="background:#F8FAFC; padding:16px; border-radius:8px; border:1px solid #CBD5E1;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+                <span style="color:#64748B; font-size:0.85rem; font-weight:700;">Total Gasto no Mês</span>
+                <span style="color:#0F172A; font-weight:800; font-size:1rem;">{fmt_brl(gasto_gas_tot)}</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+                <span style="color:#64748B; font-size:0.85rem; font-weight:700;">Litros (Estimado)</span>
+                <span style="color:#0F172A; font-weight:800; font-size:1rem;">{litros_est:.1f} L</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+                <span style="color:#64748B; font-size:0.85rem; font-weight:700;">KM Rodados até hoje</span>
+                <span style="color:#0F172A; font-weight:800; font-size:1rem;">{km_rodado_est} km</span>
+            </div>
+            <div style="background-color:#CBD5E1; height:1px; width:100%; margin:10px 0;"></div>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span style="color:#0F172A; font-weight:800; font-size:0.95rem;">Desempenho</span>
+                <span style="color:#10B981; font-weight:800; font-size:1.2rem;">{kml_est:.1f} km/L</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    with c_gas_time:
+        st.markdown("<div style='font-size:0.95rem; font-weight:700; color:#0F172A; margin-bottom:8px;'>🗓️ Calendário de Abastecimentos</div>", unsafe_allow_html=True)
+        
+        if not df_saidas.empty and col_data and col_desc_sai:
+            df_gas = df_saidas[df_saidas[col_desc_sai].astype(str).str.contains('Gasolina|Posto', case=False, na=False)].copy()
+            
+            if not df_gas.empty:
+                df_gas['Data_Obj'] = pd.to_datetime(df_gas[col_data], format='%d/%m/%Y', errors='coerce')
+                df_gas = df_gas.dropna(subset=['Data_Obj']).sort_values('Data_Obj')
+                
+                html_tl = "<div style='display:flex; flex-wrap:wrap; gap:10px;'>"
+                for _, rg in df_gas.iterrows():
+                    d_gas = int(rg['Dia'])
+                    v_gas = rg['Valor_Clean']
+                    pag_gas = str(rg[col_tipo_pag_sai]) if col_tipo_pag_sai else ""
+                    
+                    # Diferencia visualmente Flash/VR (Azul) e PIX (Laranja)
+                    cor_borda = "#0284C7" if "VR" in pag_gas or "Flash" in pag_gas else "#FF5722"
+                    cor_fundo = "#E0F2FE" if "VR" in pag_gas or "Flash" in pag_gas else "#FFEDD5"
+                    
+                    html_tl += f"""
+                    <div style="background:{cor_fundo}; border:1px solid {cor_borda}; padding:8px 14px; border-radius:8px; text-align:center; min-width:80px;">
+                        <div style="font-size:0.75rem; color:{cor_borda}; font-weight:800; text-transform:uppercase;">DIA {d_gas:02d}</div>
+                        <div style="font-size:0.95rem; color:#0F172A; font-weight:800; margin-top:2px;">{fmt_brl(v_gas)}</div>
+                    </div>
+                    """
+                html_tl += "</div>"
+                
+                qtd_abs = len(df_gas)
+                if qtd_abs > 1:
+                    primeiro = df_gas['Data_Obj'].iloc[0]
+                    ultimo = df_gas['Data_Obj'].iloc[-1]
+                    span = (ultimo - primeiro).days
+                    freq = span / (qtd_abs - 1) if span > 0 else 0
+                    freq_str = f"A cada {freq:.1f} dias" if freq > 0 else "No mesmo dia"
+                else:
+                    freq_str = f"1 vez em {dia_atual} dias"
+                    
+                st.markdown(html_tl, unsafe_allow_html=True)
+                st.markdown(f"<div style='margin-top:14px; font-size:0.9rem; color:#334155; border-top:1px dashed #CBD5E1; padding-top:8px;'>⏳ <b>Frequência de ida ao posto:</b> {freq_str}</div>", unsafe_allow_html=True)
+            else:
+                st.write("Nenhum abastecimento registrado neste mês.")
+        else:
+            st.write("Nenhum abastecimento registrado neste mês.")
+
+# --- 5. RECEITA OPERACIONAL ---
 with st.container(border=True):
     st.markdown('<div class="card-header-navy">📈 RECEITA OPERACIONAL EM CONTA & JANELAS DE PAGAMENTO</div>', unsafe_allow_html=True)
     col_rec_chart, col_rec_box = st.columns([2, 1])
-
     with col_rec_chart:
         df_rec_hist = pd.DataFrame({'Mês': ['Set/26', 'Out/26', 'Nov/26', 'Dez/26'], 'Receita': [total_receita_conta, 0, 0, 0]})
         fig_rec = px.bar(df_rec_hist, x='Mês', y='Receita', text_auto='.2s', color_discrete_sequence=['#0F172A'])
         fig_rec.update_layout(height=210, margin=dict(l=5, r=5, t=10, b=10), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', xaxis_title="", yaxis_title="")
         st.plotly_chart(fig_rec, use_container_width=True, config={'displayModeBar': False})
-
     with col_rec_box:
         st.markdown(f"""
         <div style="background:#F8FAFC; padding:18px; border-radius:8px; border:1px solid #CBD5E1;">
@@ -472,7 +521,7 @@ with st.container(border=True):
         </div>
         """, unsafe_allow_html=True)
 
-# --- 5. MAPEAMENTO DE DÍVIDAS: ATRASADAS ---
+# --- 6. MAPEAMENTO DE DÍVIDAS ---
 with st.container(border=True):
     st.markdown('<div class="card-header-orange">⚠️ MAPEAMENTO DE DÍVIDAS: ATRASADAS</div>', unsafe_allow_html=True)
 
@@ -585,7 +634,7 @@ Aguardando acordo / negociação para este credor.
         st.info("Aba 'Dívidas atrasadas' não encontrada ou vazia.")
 
 
-# --- 6. CUSTOS E PARCELAMENTOS ATIVOS ---
+# --- 7. CUSTOS E PARCELAMENTOS ATIVOS ---
 with st.container(border=True):
     st.markdown('<div class="card-header-navy">✅ CUSTOS / PARCELAMENTOS ATIVOS (POR JANELA)</div>', unsafe_allow_html=True)
 
@@ -708,7 +757,7 @@ with st.container(border=True):
         st.info("Aba 'Custos/parcelamentos ativos' não encontrada ou vazia.")
 
 
-# --- 7. INSIGHTS EXCLUSIVOS DA SUA ASSISTENTE (ÂNCORA #insights) ---
+# --- 8. INSIGHTS EXCLUSIVOS DA SUA ASSISTENTE (ÂNCORA #insights) ---
 st.markdown('<div id="insights"></div>', unsafe_allow_html=True)
 with st.container(border=True):
     st.markdown('<div class="card-header-navy">💡 INSIGHTS DA SUA ASSISTENTE PESSOAL</div>', unsafe_allow_html=True)
