@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
+import plotly.graph_objects as go  # Adicionado para o gráfico de ponteiro (Gauge) da viagem
 import urllib.parse
 import re
 import base64
@@ -71,6 +72,16 @@ st.markdown("""
 
     .card-header-orange {
         background: linear-gradient(90deg, #FF5722 0%, #E64A19 100%);
+        color: #FFFFFF;
+        padding: 14px 24px;
+        font-weight: 700;
+        font-size: 1rem;
+        text-transform: uppercase;
+        margin: -24px -28px 24px -28px;
+    }
+    
+    .card-header-blue {
+        background: linear-gradient(90deg, #0284C7 0%, #0369A1 100%);
         color: #FFFFFF;
         padding: 14px 24px;
         font-weight: 700;
@@ -199,6 +210,7 @@ df_dividas_atrasadas = carregar_aba(["Dividas atrasadas", "Dívidas Atrasadas", 
 df_dividas_fixas = carregar_aba(["Custos/parcelamentos ativos", "Custos e parcelamentos ativos", "Custos Ativos", "Dividas Fixas", "Dívidas Fixas", "Parcelamentos Fixos"])
 df_entradas = carregar_aba(["Entradas", "Entradas Agosto"])
 df_saidas = carregar_aba(["Saídas", "Saidas"])
+df_viagem = carregar_aba(["Caixinha Viagem", "Viagem", "Caixinha"])
 
 # --- PROCESSAMENTO PRÉVIO ---
 col_desc_sai = obter_coluna_por_termo(df_saidas, ['descrição do gasto', 'descrição', 'descricao'])
@@ -493,7 +505,67 @@ with st.container(border=True):
         else:
             st.write("Nenhum abastecimento registrado neste mês.")
 
-# --- 5. RECEITA OPERACIONAL ---
+# --- 5. CAIXINHA DE VIAGEM (NOVO) ---
+total_guardado_viagem = 0.0
+meta_viagem = 4000.0
+
+if not df_viagem.empty:
+    col_valor_viagem = obter_coluna_por_termo(df_viagem, ['quantidade', 'guardada', 'valor'])
+    if col_valor_viagem:
+        df_viagem['Valor_Clean'] = df_viagem[col_valor_viagem].apply(limpar_valor)
+        total_guardado_viagem = df_viagem['Valor_Clean'].sum()
+
+pct_viagem = min((total_guardado_viagem / meta_viagem) * 100, 100)
+falta_viagem = max(meta_viagem - total_guardado_viagem, 0)
+
+with st.container(border=True):
+    st.markdown('<div class="card-header-blue" style="background: linear-gradient(90deg, #0284C7 0%, #0369A1 100%); color: #FFFFFF; padding: 14px 24px; font-weight: 700; font-size: 1rem; text-transform: uppercase; margin: -24px -28px 24px -28px;">✈️ CAIXINHA DE VIAGEM (BAHIA COM O LUCCA)</div>', unsafe_allow_html=True)
+    
+    c_v1, c_v2 = st.columns([1.2, 1])
+    
+    with c_v1:
+        st.markdown(f"""
+        <div style="background:#F8FAFC; padding:20px; border-radius:8px; border:1px solid #CBD5E1; height: 100%;">
+            <div style="font-size:1.15rem; font-weight:800; color:#0F172A; margin-bottom:12px;">Nossa Meta: {fmt_brl(meta_viagem)}</div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                <span style="color:#334155; font-weight:600;">Já guardamos:</span>
+                <span style="color:#10B981; font-weight:800; font-size:1.1rem;">{fmt_brl(total_guardado_viagem)}</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                <span style="color:#334155; font-weight:600;">Falta para a viagem:</span>
+                <span style="color:#FF5722; font-weight:800; font-size:1.1rem;">{fmt_brl(falta_viagem)}</span>
+            </div>
+            <div style="background-color:#CBD5E1; height:1px; width:100%; margin:12px 0;"></div>
+            <div style="font-size:0.9rem; color:#334155; line-height:1.5;">
+                <b>Dica da sua Assistente:</b> Sei que no momento o foco é outro, mas ter esse sonho no radar é o que nos dá energia! Assim que o cartão dar um respiro, começamos com R$ 50 ou R$ 100. A Bahia espera por vocês! 🌴🥥
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    with c_v2:
+        fig_gauge = go.Figure(go.Indicator(
+            mode = "gauge+number",
+            value = pct_viagem,
+            number = {'suffix': "%", 'font': {'size': 40, 'color': '#0F172A', 'family': 'Segoe UI', 'weight': 'bold'}},
+            domain = {'x': [0, 1], 'y': [0, 1]},
+            title = {'text': "Progresso da Viagem", 'font': {'size': 16, 'color': '#64748B', 'family': 'Segoe UI'}},
+            gauge = {
+                'axis': {'range': [None, 100], 'tickwidth': 1, 'tickcolor': "#CBD5E1"},
+                'bar': {'color': "#0284C7"},
+                'bgcolor': "#E2E8F0",
+                'borderwidth': 2,
+                'bordercolor': "#FFFFFF",
+                'steps': [
+                    {'range': [0, 30], 'color': '#FEE2E2'},
+                    {'range': [30, 70], 'color': '#FEF3C7'},
+                    {'range': [70, 100], 'color': '#D1FAE5'}],
+            }
+        ))
+        fig_gauge.update_layout(height=220, margin=dict(l=20, r=20, t=40, b=20), paper_bgcolor='rgba(0,0,0,0)')
+        st.plotly_chart(fig_gauge, use_container_width=True, config={'displayModeBar': False})
+
+
+# --- 6. RECEITA OPERACIONAL ---
 with st.container(border=True):
     st.markdown('<div class="card-header-navy">📈 RECEITA OPERACIONAL EM CONTA & JANELAS DE PAGAMENTO</div>', unsafe_allow_html=True)
     col_rec_chart, col_rec_box = st.columns([2, 1])
@@ -516,7 +588,7 @@ with st.container(border=True):
         </div>
         """, unsafe_allow_html=True)
 
-# --- 6. MAPEAMENTO DE DÍVIDAS ---
+# --- 7. MAPEAMENTO DE DÍVIDAS ---
 with st.container(border=True):
     st.markdown('<div class="card-header-orange">⚠️ MAPEAMENTO DE DÍVIDAS: ATRASADAS</div>', unsafe_allow_html=True)
 
@@ -628,7 +700,7 @@ Aguardando acordo / negociação para este credor.
     else:
         st.info("Aba 'Dívidas atrasadas' não encontrada ou vazia.")
 
-# --- 7. CUSTOS E PARCELAMENTOS ATIVOS ---
+# --- 8. CUSTOS E PARCELAMENTOS ATIVOS ---
 with st.container(border=True):
     st.markdown('<div class="card-header-navy">✅ CUSTOS / PARCELAMENTOS ATIVOS (POR JANELA)</div>', unsafe_allow_html=True)
 
@@ -750,7 +822,7 @@ with st.container(border=True):
     else:
         st.info("Aba 'Custos/parcelamentos ativos' não encontrada ou vazia.")
 
-# --- 8. INSIGHTS EXCLUSIVOS DA SUA ASSISTENTE (ÂNCORA #insights) ---
+# --- 9. INSIGHTS EXCLUSIVOS DA SUA ASSISTENTE (ÂNCORA #insights) ---
 st.markdown('<div id="insights"></div>', unsafe_allow_html=True)
 with st.container(border=True):
     st.markdown('<div class="card-header-navy">💡 INSIGHTS DA SUA ASSISTENTE PESSOAL</div>', unsafe_allow_html=True)
