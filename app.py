@@ -91,10 +91,6 @@ st.markdown("""
     .kpi-card-green { border-left-color: #10B981; }
     .kpi-card-blue { border-left-color: #0284C7; }
 
-    .kpi-title { font-size: 0.85rem; font-weight: 700; color: #64748B; text-transform: uppercase; margin-bottom: 6px; }
-    .kpi-value-main { font-size: 1.8rem !important; font-weight: 800 !important; line-height: 1.2 !important; }
-    .kpi-subtext { font-size: 0.85rem; font-weight: 600; color: #64748B; margin-top: 4px; }
-    
     /* AVATAR EXPANDIDO E CENTRALIZADO */
     .avatar-frame {
         width: 140px;
@@ -414,7 +410,7 @@ with st.container(border=True):
         </div>
         """, unsafe_allow_html=True)
 
-# --- 4. NOVO: RAIO-X DO COMBUSTÍVEL ---
+# --- 4. RAIO-X DO COMBUSTÍVEL ---
 with st.container(border=True):
     st.markdown('<div class="card-header-navy">⛽ RAIO-X DO COMBUSTÍVEL E CONSUMO</div>', unsafe_allow_html=True)
     
@@ -426,7 +422,6 @@ with st.container(border=True):
         km_diario = st.number_input("Média rodada (KM/dia)", value=30, step=1)
         
     with c_gas_kpi:
-        # Cálculos de estimativa
         litros_est = gasto_gas_tot / preco_gasolina if preco_gasolina > 0 else 0
         km_rodado_est = km_diario * dia_atual
         kml_est = km_rodado_est / litros_est if litros_est > 0 else 0
@@ -463,23 +458,19 @@ with st.container(border=True):
                 df_gas['Data_Obj'] = pd.to_datetime(df_gas[col_data], format='%d/%m/%Y', errors='coerce')
                 df_gas = df_gas.dropna(subset=['Data_Obj']).sort_values('Data_Obj')
                 
-                html_tl = "<div style='display:flex; flex-wrap:wrap; gap:10px;'>"
+                cards_html = []
                 for _, rg in df_gas.iterrows():
                     d_gas = int(rg['Dia'])
                     v_gas = rg['Valor_Clean']
                     pag_gas = str(rg[col_tipo_pag_sai]) if col_tipo_pag_sai else ""
                     
-                    # Diferencia visualmente Flash/VR (Azul) e PIX (Laranja)
                     cor_borda = "#0284C7" if "VR" in pag_gas or "Flash" in pag_gas else "#FF5722"
                     cor_fundo = "#E0F2FE" if "VR" in pag_gas or "Flash" in pag_gas else "#FFEDD5"
                     
-                    html_tl += f"""
-                    <div style="background:{cor_fundo}; border:1px solid {cor_borda}; padding:8px 14px; border-radius:8px; text-align:center; min-width:80px;">
-                        <div style="font-size:0.75rem; color:{cor_borda}; font-weight:800; text-transform:uppercase;">DIA {d_gas:02d}</div>
-                        <div style="font-size:0.95rem; color:#0F172A; font-weight:800; margin-top:2px;">{fmt_brl(v_gas)}</div>
-                    </div>
-                    """
-                html_tl += "</div>"
+                    card = f'<div style="background:{cor_fundo}; border:1px solid {cor_borda}; padding:8px 14px; border-radius:8px; text-align:center; min-width:80px;"><div style="font-size:0.75rem; color:{cor_borda}; font-weight:800; text-transform:uppercase;">DIA {d_gas:02d}</div><div style="font-size:0.95rem; color:#0F172A; font-weight:800; margin-top:2px;">{fmt_brl(v_gas)}</div></div>'
+                    cards_html.append(card)
+                
+                html_tl = f'<div style="display:flex; flex-wrap:wrap; gap:10px;">{"".join(cards_html)}</div>'
                 
                 qtd_abs = len(df_gas)
                 if qtd_abs > 1:
@@ -633,7 +624,6 @@ Aguardando acordo / negociação para este credor.
     else:
         st.info("Aba 'Dívidas atrasadas' não encontrada ou vazia.")
 
-
 # --- 7. CUSTOS E PARCELAMENTOS ATIVOS ---
 with st.container(border=True):
     st.markdown('<div class="card-header-navy">✅ CUSTOS / PARCELAMENTOS ATIVOS (POR JANELA)</div>', unsafe_allow_html=True)
@@ -755,7 +745,6 @@ with st.container(border=True):
                 st.write("Sem registros para esta janela.")
     else:
         st.info("Aba 'Custos/parcelamentos ativos' não encontrada ou vazia.")
-
 
 # --- 8. INSIGHTS EXCLUSIVOS DA SUA ASSISTENTE (ÂNCORA #insights) ---
 st.markdown('<div id="insights"></div>', unsafe_allow_html=True)
