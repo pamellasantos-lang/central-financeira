@@ -254,7 +254,7 @@ df_entradas = carregar_aba(["Entradas", "Entradas Agosto"])
 df_saidas = carregar_aba(["Saídas", "Saidas"])
 df_viagem = carregar_aba(["Caixinha Viagem", "Caixinha viagem", "Viagem"])
 
-# --- HEADER COM SELETORES ---
+# --- ESTRUTURA DO CABEÇALHO COM CONTAINERS DINÂMICOS ---
 meses_botoes = [
     "jan",
     "fev",
@@ -271,40 +271,20 @@ meses_botoes = [
 ]
 meses_map = {m: i + 1 for i, m in enumerate(meses_botoes)}
 
-# Renderiza primeiro a estrutura para obter os seletores
 dia_atual = datetime.now().day
 if dia_atual == 0:
   dia_atual = 1
 
-# Pré-cálculo rápido para a mensagem do semáforo antes de filtrar
-pct_gasto_total = 0.0
-
 with st.container(border=True):
   col_av, col_content = st.columns([1.3, 7.7])
-  with col_av:
-    # Avatar temporário até calcular semáforo do mês
-    avatar_src = "https://cdn-icons-png.flaticon.com/512/4140/4140048.png"
-    st.markdown(
-        f"""
-        <div style="display: flex; justify-content: center; align-items: center; height: 100%; padding-top: 5px;">
-            <img src="{avatar_src}" class="avatar-frame" style="border: 5px solid #10B981;" alt="Avatar da Assistente">
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
   with col_content:
     st.markdown(
-        """
-        <h2 style='margin:0; padding-top:0px; font-size:1.65rem; font-weight:800; color:#0F172A;'>CONTROLE FINANCEIRO <span style='color:#FF5722;'>PAMELLA</span></h2>
-        <div class="speech-bubble">
-            <b style="color:#10B981; font-size:1.0rem;">🟢 Painel Carregado!</b> <span style="font-size:0.85rem; color:#64748B;">Selecione o mês para analisar os dados. 😊</span><br>
-            <span style="font-size:0.85rem; color:#334155; display:inline-block; margin-top:2px;">
-                Caso queira saber mais, acesse o painel <a href="#insights" style="color:#0284C7; font-weight:700; text-decoration:none;">INSIGHTS DA ASSISTENTE clicando aqui</a>.
-            </span>
-        </div>
-        """,
+        """<h2 style='margin:0; padding-top:0px; font-size:1.65rem; font-weight:800; color:#0F172A;'>CONTROLE FINANCEIRO <span style='color:#FF5722;'>PAMELLA</span></h2>""",
         unsafe_allow_html=True,
     )
+
+    speech_placeholder = st.empty()
+
     st.markdown("<div style='margin-top: 8px;'></div>", unsafe_allow_html=True)
     c_ano, c_mes = st.columns([0.95, 8.05])
     with c_ano:
@@ -322,7 +302,7 @@ with st.container(border=True):
 
 num_mes_sel = meses_map[mes_selecionado]
 
-# --- FILTRAGEM RIGOROSA POR MÊS E ANO ---
+# --- FILTRAGEM DE DADOS DO MÊS ---
 col_desc_sai = obter_coluna_por_termo(
     df_saidas, ["descrição do gasto", "descrição", "descricao"]
 )
@@ -353,7 +333,6 @@ if not df_saidas.empty and col_val_sai:
 else:
   df_saidas_mes = pd.DataFrame()
 
-# Processamento de Entradas filtradas
 col_data_ent = obter_coluna_por_termo(df_entradas, ["data"])
 col_val_ent = obter_coluna_valor_principal(df_entradas)
 
@@ -372,7 +351,7 @@ if not df_entradas.empty and col_val_ent:
 else:
   df_entradas_mes = pd.DataFrame()
 
-# CÁLCULO DE TOTALIZADORES DO MÊS SELECIONADO
+# CÁLCULOS DO MÊS
 total_entradas_pix, total_entradas_vr = 0.0, 0.0
 entradas_salario_pix, entradas_adiantamento_pix = 0.0, 0.0
 
@@ -470,6 +449,65 @@ if not df_saidas_mes.empty:
 sobra_liquida = total_entradas_pix - total_saidas_pix
 sobra_salario = entradas_salario_pix - saidas_salario_pix
 sobra_adiantamento = entradas_adiantamento_pix - saidas_adiantamento_pix
+
+# --- ATUALIZAÇÃO DINÂMICA DA ASSISTENTE E SEMÁFORO ---
+pct_gasto_total = (
+    (total_saidas_pix / total_entradas_pix) * 100
+    if total_entradas_pix > 0
+    else (100 if total_saidas_pix > 0 else 0)
+)
+
+if pct_gasto_total <= 60 and (total_entradas_pix > 0 or total_saidas_pix == 0):
+  cor_semaforo = "#10B981"
+  border_semaforo = "#10B981"
+  status_texto = "🟢 Mês sob controle!"
+  assistente_expressao = "Tudo dentro do planejado! 😊"
+  avatar_file = "assistente_feliz.png"
+elif pct_gasto_total > 75 or (pct_gasto_total > 50 and dia_atual <= 10):
+  cor_semaforo = "#FF5722"
+  border_semaforo = "#FF5722"
+  status_texto = "🔴 Alerta de Gastos!"
+  assistente_expressao = "Hora de pisar no freio! 😟"
+  avatar_file = "assistente_triste.png"
+else:
+  cor_semaforo = "#F59E0B"
+  border_semaforo = "#F59E0B"
+  status_texto = "🟡 Atenção ao orçamento!"
+  assistente_expressao = "Vamos monitorar com cuidado. 😐"
+  avatar_file = "assistente_atenta.png"
+
+img_base64 = get_image_base64(avatar_file)
+if not img_base64:
+  img_base64 = get_image_base64("assistente.png")
+
+avatar_src = (
+    f"data:image/png;base64,{img_base64}"
+    if img_base64
+    else "https://cdn-icons-png.flaticon.com/512/4140/4140048.png"
+)
+
+# Injeta a foto e a mensagem calculada
+with col_av:
+  st.markdown(
+      f"""
+    <div style="display: flex; justify-content: center; align-items: center; height: 100%; padding-top: 5px;">
+        <img src="{avatar_src}" class="avatar-frame" style="border: 5px solid {border_semaforo};" alt="Avatar da Assistente">
+    </div>
+    """,
+      unsafe_allow_html=True,
+  )
+
+speech_placeholder.markdown(
+    f"""
+<div class="speech-bubble">
+    <b style="color:{cor_semaforo}; font-size:1.0rem;">{status_texto}</b> <span style="font-size:0.85rem; color:#64748B;">{assistente_expressao}</span><br>
+    <span style="font-size:0.85rem; color:#334155; display:inline-block; margin-top:2px;">
+        Caso queira saber mais, acesse o painel <a href="#insights" style="color:#0284C7; font-weight:700; text-decoration:none;">INSIGHTS DA ASSISTENTE clicando aqui</a>.
+    </span>
+</div>
+""",
+    unsafe_allow_html=True,
+)
 
 # --- 1. RESUMO EXECUTIVO GERAL ---
 with st.container(border=True):
