@@ -1328,7 +1328,7 @@ with st.container(border=True):
   else:
     st.info("Aba 'Custos/parcelamentos ativos' não encontrada ou vazia.")
 
-# --- 9. DISTRIBUIÇÃO E DETALHAMENTO DOS GASTOS (NOVO MÓDULO NO FINAL) ---
+# --- 9. DISTRIBUIÇÃO E DETALHAMENTO DOS GASTOS (REFORMULADO COM BARRAS HORIZONTAIS) ---
 with st.container(border=True):
   st.markdown(
       '<div class="card-header-navy">📊 DISTRIBUIÇÃO E DETALHAMENTO DOS'
@@ -1351,56 +1351,76 @@ with st.container(border=True):
         df_cat = (
             df_saidas_mes.groupby(col_tg)["Valor_Clean"].sum().reset_index()
         )
-        fig_donut = px.pie(
+        tot_gasto = df_cat["Valor_Clean"].sum()
+        df_cat["Porcentagem"] = (
+            (df_cat["Valor_Clean"] / tot_gasto) * 100 if tot_gasto > 0 else 0
+        )
+        df_cat = df_cat.sort_values("Valor_Clean", ascending=True)
+
+        fig_bar_cat = px.bar(
             df_cat,
-            values="Valor_Clean",
-            names=col_tg,
-            hole=0.4,
-            title="<b>Porcentagem por Tipo de Gasto</b>",
-            color_discrete_sequence=px.colors.qualitative.Set3,
+            x="Porcentagem",
+            y=col_tg,
+            orientation="h",
+            title="<b>Porcentagem por Tipo de Gasto (%)</b>",
+            color_discrete_sequence=["#0284C7"],
         )
-        fig_donut.update_traces(
-            textinfo="percent+label", textposition="inside"
+        fig_bar_cat.update_traces(
+            texttemplate="%{x:.1f}%", textposition="outside", cliponaxis=False
         )
-        fig_donut.update_layout(
-            height=350,
-            margin=dict(l=10, r=10, t=40, b=10),
+        fig_bar_cat.update_layout(
+            height=380,
+            margin=dict(l=10, r=40, t=40, b=10),
             paper_bgcolor="rgba(0,0,0,0)",
-            legend=dict(
-                orientation="h",
-                yanchor="bottom",
-                y=-0.2,
-                xanchor="center",
-                x=0.5,
-            ),
+            plot_bgcolor="rgba(0,0,0,0)",
+            xaxis_title="",
+            yaxis_title="",
         )
         st.plotly_chart(
-            fig_donut,
+            fig_bar_cat,
             use_container_width=True,
             config={"displayModeBar": False},
         )
 
       with c_chart2:
         df_desc = (
-            df_saidas_mes.groupby([col_tg, col_desc])["Valor_Clean"]
+            df_saidas_mes.groupby([col_desc, col_tg])["Valor_Clean"]
             .sum()
             .reset_index()
         )
-        fig_tree = px.treemap(
+        df_desc = df_desc.sort_values("Valor_Clean", ascending=True)
+
+        fig_bar_desc = px.bar(
             df_desc,
-            path=[col_tg, col_desc],
-            values="Valor_Clean",
-            title="<b>Detalhamento por Descrição do Gasto</b>",
-            color="Valor_Clean",
-            color_continuous_scale="Blues",
+            x="Valor_Clean",
+            y=col_desc,
+            orientation="h",
+            color=col_tg,
+            title="<b>Valor Total por Descrição (R$)</b>",
+            color_discrete_sequence=px.colors.qualitative.Set2,
         )
-        fig_tree.update_layout(
-            height=350,
-            margin=dict(l=10, r=10, t=40, b=10),
+        fig_bar_desc.update_traces(
+            texttemplate="R$ %{x:,.2f}",
+            textposition="outside",
+            cliponaxis=False,
+        )
+        fig_bar_desc.update_layout(
+            height=380,
+            margin=dict(l=10, r=60, t=40, b=10),
             paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            xaxis_title="",
+            yaxis_title="",
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=-0.25,
+                xanchor="center",
+                x=0.5,
+            ),
         )
         st.plotly_chart(
-            fig_tree,
+            fig_bar_desc,
             use_container_width=True,
             config={"displayModeBar": False},
         )
