@@ -486,7 +486,6 @@ avatar_src = (
     else "https://cdn-icons-png.flaticon.com/512/4140/4140048.png"
 )
 
-# Injeta a foto e a mensagem calculada
 with col_av:
   st.markdown(
       f"""
@@ -670,7 +669,7 @@ with st.container(border=True):
         unsafe_allow_html=True,
     )
     preco_gasolina = st.number_input(
-        "Preço Médio (R$/Litro)", value=5.80, step=0.10, format="%.2f"
+        "Preço Médio (R$/Litro)", value=4.70, step=0.10, format="%.2f"
     )
     km_diario = st.number_input("Média rodada (KM/dia)", value=30, step=1)
 
@@ -1329,7 +1328,90 @@ with st.container(border=True):
   else:
     st.info("Aba 'Custos/parcelamentos ativos' não encontrada ou vazia.")
 
-# --- 9. INSIGHTS EXCLUSIVOS DA SUA ASSISTENTE (ÂNCORA #insights) ---
+# --- 9. DISTRIBUIÇÃO E DETALHAMENTO DOS GASTOS (NOVO MÓDULO NO FINAL) ---
+with st.container(border=True):
+  st.markdown(
+      '<div class="card-header-navy">📊 DISTRIBUIÇÃO E DETALHAMENTO DOS'
+      " GASTOS</div>",
+      unsafe_allow_html=True,
+  )
+
+  if not df_saidas_mes.empty and total_saidas_pix > 0:
+    col_tg = obter_coluna_por_termo(
+        df_saidas_mes, ["tipo de gasto", "categoria"]
+    )
+    col_desc = obter_coluna_por_termo(
+        df_saidas_mes, ["descrição do gasto", "descrição", "descricao"]
+    )
+
+    if col_tg and col_desc:
+      c_chart1, c_chart2 = st.columns(2)
+
+      with c_chart1:
+        df_cat = (
+            df_saidas_mes.groupby(col_tg)["Valor_Clean"].sum().reset_index()
+        )
+        fig_donut = px.pie(
+            df_cat,
+            values="Valor_Clean",
+            names=col_tg,
+            hole=0.4,
+            title="<b>Porcentagem por Tipo de Gasto</b>",
+            color_discrete_sequence=px.colors.qualitative.Set3,
+        )
+        fig_donut.update_traces(
+            textinfo="percent+label", textposition="inside"
+        )
+        fig_donut.update_layout(
+            height=350,
+            margin=dict(l=10, r=10, t=40, b=10),
+            paper_bgcolor="rgba(0,0,0,0)",
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=-0.2,
+                xanchor="center",
+                x=0.5,
+            ),
+        )
+        st.plotly_chart(
+            fig_donut,
+            use_container_width=True,
+            config={"displayModeBar": False},
+        )
+
+      with c_chart2:
+        df_desc = (
+            df_saidas_mes.groupby([col_tg, col_desc])["Valor_Clean"]
+            .sum()
+            .reset_index()
+        )
+        fig_tree = px.treemap(
+            df_desc,
+            path=[col_tg, col_desc],
+            values="Valor_Clean",
+            title="<b>Detalhamento por Descrição do Gasto</b>",
+            color="Valor_Clean",
+            color_continuous_scale="Blues",
+        )
+        fig_tree.update_layout(
+            height=350,
+            margin=dict(l=10, r=10, t=40, b=10),
+            paper_bgcolor="rgba(0,0,0,0)",
+        )
+        st.plotly_chart(
+            fig_tree,
+            use_container_width=True,
+            config={"displayModeBar": False},
+        )
+    else:
+      st.info("Colunas de 'Tipo de Gasto' ou 'Descrição' não localizadas.")
+  else:
+    st.info(
+        "Sem lançamentos na aba Saídas para este mês para gerar o detalhamento."
+    )
+
+# --- 10. INSIGHTS EXCLUSIVOS DA SUA ASSISTENTE (ÂNCORA #insights) ---
 st.markdown('<div id="insights"></div>', unsafe_allow_html=True)
 with st.container(border=True):
   st.markdown(
