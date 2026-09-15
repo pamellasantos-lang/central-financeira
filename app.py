@@ -1328,7 +1328,7 @@ with st.container(border=True):
   else:
     st.info("Aba 'Custos/parcelamentos ativos' não encontrada ou vazia.")
 
-# --- 9. DISTRIBUIÇÃO E DETALHAMENTO DOS GASTOS (LIMPO E FORMATADO) ---
+# --- 9. DISTRIBUIÇÃO E DETALHAMENTO DOS GASTOS (ORDENADO E LIMPO) ---
 with st.container(border=True):
   st.markdown(
       '<div class="card-header-navy">📊 DISTRIBUIÇÃO E DETALHAMENTO DOS'
@@ -1388,7 +1388,6 @@ with st.container(border=True):
             .sum()
             .reset_index()
         )
-        df_desc = df_desc.sort_values("Valor_Clean", ascending=True)
 
         num_itens = len(df_desc)
         altura_dinamica = max(520, num_itens * 32)
@@ -1424,6 +1423,9 @@ with st.container(border=True):
                 x=1,
             ),
         )
+        # Força o maior gasto no topo da visualização
+        fig_bar_desc.update_yaxes(categoryorder="total ascending")
+
         st.plotly_chart(
             fig_bar_desc,
             use_container_width=True,
