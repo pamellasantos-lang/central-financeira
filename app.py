@@ -1328,7 +1328,7 @@ with st.container(border=True):
   else:
     st.info("Aba 'Custos/parcelamentos ativos' não encontrada ou vazia.")
 
-# --- 9. DISTRIBUIÇÃO E DETALHAMENTO DOS GASTOS (REFORMULADO COM BARRAS HORIZONTAIS) ---
+# --- 9. DISTRIBUIÇÃO E DETALHAMENTO DOS GASTOS (OTIMIZADO) ---
 with st.container(border=True):
   st.markdown(
       '<div class="card-header-navy">📊 DISTRIBUIÇÃO E DETALHAMENTO DOS'
@@ -1345,39 +1345,37 @@ with st.container(border=True):
     )
 
     if col_tg and col_desc:
-      c_chart1, c_chart2 = st.columns(2)
+      c_chart1, c_chart2 = st.columns([1, 1.25])
 
       with c_chart1:
         df_cat = (
             df_saidas_mes.groupby(col_tg)["Valor_Clean"].sum().reset_index()
         )
-        tot_gasto = df_cat["Valor_Clean"].sum()
-        df_cat["Porcentagem"] = (
-            (df_cat["Valor_Clean"] / tot_gasto) * 100 if tot_gasto > 0 else 0
-        )
-        df_cat = df_cat.sort_values("Valor_Clean", ascending=True)
-
-        fig_bar_cat = px.bar(
+        fig_donut = px.pie(
             df_cat,
-            x="Porcentagem",
-            y=col_tg,
-            orientation="h",
+            values="Valor_Clean",
+            names=col_tg,
+            hole=0.4,
             title="<b>Porcentagem por Tipo de Gasto (%)</b>",
-            color_discrete_sequence=["#0284C7"],
+            color_discrete_sequence=px.colors.qualitative.Set3,
         )
-        fig_bar_cat.update_traces(
-            texttemplate="%{x:.1f}%", textposition="outside", cliponaxis=False
+        fig_donut.update_traces(
+            textinfo="percent+label", textposition="inside"
         )
-        fig_bar_cat.update_layout(
-            height=380,
-            margin=dict(l=10, r=40, t=40, b=10),
+        fig_donut.update_layout(
+            height=520,
+            margin=dict(l=10, r=10, t=40, b=20),
             paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)",
-            xaxis_title="",
-            yaxis_title="",
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=-0.15,
+                xanchor="center",
+                x=0.5,
+            ),
         )
         st.plotly_chart(
-            fig_bar_cat,
+            fig_donut,
             use_container_width=True,
             config={"displayModeBar": False},
         )
@@ -1389,6 +1387,9 @@ with st.container(border=True):
             .reset_index()
         )
         df_desc = df_desc.sort_values("Valor_Clean", ascending=True)
+
+        num_itens = len(df_desc)
+        altura_dinamica = max(520, num_itens * 28)
 
         fig_bar_desc = px.bar(
             df_desc,
@@ -1405,18 +1406,19 @@ with st.container(border=True):
             cliponaxis=False,
         )
         fig_bar_desc.update_layout(
-            height=380,
-            margin=dict(l=10, r=60, t=40, b=10),
+            height=altura_dinamica,
+            margin=dict(l=10, r=90, t=50, b=30),
             paper_bgcolor="rgba(0,0,0,0)",
             plot_bgcolor="rgba(0,0,0,0)",
             xaxis_title="",
             yaxis_title="",
+            legend_title_text="Tipo de Gasto",
             legend=dict(
                 orientation="h",
                 yanchor="bottom",
-                y=-0.25,
-                xanchor="center",
-                x=0.5,
+                y=1.02,
+                xanchor="right",
+                x=1,
             ),
         )
         st.plotly_chart(
