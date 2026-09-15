@@ -1207,9 +1207,9 @@ with st.container(border=True):
             )
             if "/" in p_val:
               try:
-                pt = p_val.split("/")
-                curr_p = int(pt[0].strip())
-                tot_p = int(pt[1].strip())
+                partes = p_val.split("/")
+                curr_p = int(partes[0].strip())
+                tot_p = int(partes[1].strip())
                 if curr_p > 0:
                   qtd_pagas = max(qtd_pagas, curr_p)
                 if tot_p > 1:
@@ -1328,7 +1328,7 @@ with st.container(border=True):
   else:
     st.info("Aba 'Custos/parcelamentos ativos' não encontrada ou vazia.")
 
-# --- 9. DISTRIBUIÇÃO E DETALHAMENTO DOS GASTOS (OTIMIZADO) ---
+# --- 9. DISTRIBUIÇÃO E DETALHAMENTO DOS GASTOS (LIMPO E FORMATADO) ---
 with st.container(border=True):
   st.markdown(
       '<div class="card-header-navy">📊 DISTRIBUIÇÃO E DETALHAMENTO DOS'
@@ -1345,7 +1345,7 @@ with st.container(border=True):
     )
 
     if col_tg and col_desc:
-      c_chart1, c_chart2 = st.columns([1, 1.25])
+      c_chart1, c_chart2 = st.columns([1, 1.35])
 
       with c_chart1:
         df_cat = (
@@ -1360,7 +1360,9 @@ with st.container(border=True):
             color_discrete_sequence=px.colors.qualitative.Set3,
         )
         fig_donut.update_traces(
-            textinfo="percent+label", textposition="inside"
+            textinfo="percent",
+            textposition="inside",
+            hovertemplate="<b>%{label}</b><br>Valor: R$ %{value:,.2f}<br>Porcentagem: %{percent}<extra></extra>",
         )
         fig_donut.update_layout(
             height=520,
@@ -1389,7 +1391,7 @@ with st.container(border=True):
         df_desc = df_desc.sort_values("Valor_Clean", ascending=True)
 
         num_itens = len(df_desc)
-        altura_dinamica = max(520, num_itens * 28)
+        altura_dinamica = max(520, num_itens * 32)
 
         fig_bar_desc = px.bar(
             df_desc,
@@ -1401,13 +1403,14 @@ with st.container(border=True):
             color_discrete_sequence=px.colors.qualitative.Set2,
         )
         fig_bar_desc.update_traces(
-            texttemplate="R$ %{x:,.2f}",
+            texttemplate="  R$ %{x:,.2f}",
             textposition="outside",
             cliponaxis=False,
+            hovertemplate="<b>%{y}</b><br>Categoria: %{fullData.name}<br>Valor: R$ %{x:,.2f}<extra></extra>",
         )
         fig_bar_desc.update_layout(
             height=altura_dinamica,
-            margin=dict(l=10, r=90, t=50, b=30),
+            margin=dict(l=10, r=120, t=50, b=30),
             paper_bgcolor="rgba(0,0,0,0)",
             plot_bgcolor="rgba(0,0,0,0)",
             xaxis_title="",
