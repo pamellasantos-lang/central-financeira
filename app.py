@@ -1207,9 +1207,9 @@ with st.container(border=True):
             )
             if "/" in p_val:
               try:
-                partes = p_val.split("/")
-                curr_p = int(partes[0].strip())
-                tot_p = int(partes[1].strip())
+                pt = p_val.split("/")
+                curr_p = int(pt[0].strip())
+                tot_p = int(pt[1].strip())
                 if curr_p > 0:
                   qtd_pagas = max(qtd_pagas, curr_p)
                 if tot_p > 1:
@@ -1328,7 +1328,7 @@ with st.container(border=True):
   else:
     st.info("Aba 'Custos/parcelamentos ativos' não encontrada ou vazia.")
 
-# --- 9. DISTRIBUIÇÃO E DETALHAMENTO DOS GASTOS (ORDENADO E LIMPO) ---
+# --- 9. DISTRIBUIÇÃO E DETALHAMENTO DOS GASTOS (COM MINI PÓDIO VISUAL) ---
 with st.container(border=True):
   st.markdown(
       '<div class="card-header-navy">📊 DISTRIBUIÇÃO E DETALHAMENTO DOS'
@@ -1345,6 +1345,66 @@ with st.container(border=True):
     )
 
     if col_tg and col_desc:
+      df_desc = (
+          df_saidas_mes.groupby([col_desc, col_tg])["Valor_Clean"]
+          .sum()
+          .reset_index()
+      )
+      df_sorted = df_desc.sort_values("Valor_Clean", ascending=False)
+
+      # --- MINI PÓDIO EM CARDS VISUAIS ---
+      if not df_sorted.empty:
+        top1 = df_sorted.iloc[0]
+        top2 = df_sorted.iloc[1] if len(df_sorted) > 1 else None
+        top3 = df_sorted.iloc[2] if len(df_sorted) > 2 else None
+        bot1 = df_sorted.iloc[-1] if len(df_sorted) > 0 else None
+
+        cp1, cp2, cp3, cp4 = st.columns(4)
+        with cp1:
+          st.markdown(
+              f"""<div style="background:#FEF3C7; border:1px solid #F59E0B; padding:12px; border-radius:8px; text-align:center;">
+                  <div style="font-size:0.8rem; font-weight:800; color:#B45309;">🥇 1º MAIOR GASTO</div>
+                  <div style="font-size:1.0rem; font-weight:800; color:#0F172A; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{top1[col_desc]}</div>
+                  <div style="font-size:1.1rem; font-weight:800; color:#B45309;">{fmt_brl(top1["Valor_Clean"])}</div>
+              </div>""",
+              unsafe_allow_html=True,
+          )
+        with cp2:
+          if top2 is not None:
+            st.markdown(
+                f"""<div style="background:#F1F5F9; border:1px solid #94A3B8; padding:12px; border-radius:8px; text-align:center;">
+                    <div style="font-size:0.8rem; font-weight:800; color:#475569;">🥈 2º MAIOR GASTO</div>
+                    <div style="font-size:1.0rem; font-weight:800; color:#0F172A; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{top2[col_desc]}</div>
+                    <div style="font-size:1.1rem; font-weight:800; color:#475569;">{fmt_brl(top2["Valor_Clean"])}</div>
+                </div>""",
+                unsafe_allow_html=True,
+            )
+        with cp3:
+          if top3 is not None:
+            st.markdown(
+                f"""<div style="background:#FFEDD5; border:1px solid #F97316; padding:12px; border-radius:8px; text-align:center;">
+                    <div style="font-size:0.8rem; font-weight:800; color:#C2410C;">🥉 3º MAIOR GASTO</div>
+                    <div style="font-size:1.0rem; font-weight:800; color:#0F172A; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{top3[col_desc]}</div>
+                    <div style="font-size:1.1rem; font-weight:800; color:#C2410C;">{fmt_brl(top3["Valor_Clean"])}</div>
+                </div>""",
+                unsafe_allow_html=True,
+            )
+        with cp4:
+          if bot1 is not None:
+            st.markdown(
+                f"""<div style="background:#E0F2FE; border:1px solid #0284C7; padding:12px; border-radius:8px; text-align:center;">
+                    <div style="font-size:0.8rem; font-weight:800; color:#0369A1;">🔻 MENOR GASTO</div>
+                    <div style="font-size:1.0rem; font-weight:800; color:#0F172A; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{bot1[col_desc]}</div>
+                    <div style="font-size:1.1rem; font-weight:800; color:#0369A1;">{fmt_brl(bot1["Valor_Clean"])}</div>
+                </div>""",
+                unsafe_allow_html=True,
+            )
+
+        st.markdown(
+            "<div style='margin-bottom:15px;'></div>", unsafe_allow_html=True
+        )
+
+      # --- GRÁFICOS VISUAIS ---
       c_chart1, c_chart2 = st.columns([1, 1.35])
 
       with c_chart1:
@@ -1383,12 +1443,6 @@ with st.container(border=True):
         )
 
       with c_chart2:
-        df_desc = (
-            df_saidas_mes.groupby([col_desc, col_tg])["Valor_Clean"]
-            .sum()
-            .reset_index()
-        )
-
         num_itens = len(df_desc)
         altura_dinamica = max(520, num_itens * 32)
 
@@ -1423,7 +1477,6 @@ with st.container(border=True):
                 x=1,
             ),
         )
-        # Força o maior gasto no topo da visualização
         fig_bar_desc.update_yaxes(categoryorder="total ascending")
 
         st.plotly_chart(
